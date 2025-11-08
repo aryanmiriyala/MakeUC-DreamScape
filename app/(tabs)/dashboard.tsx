@@ -1,8 +1,8 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 const sessionHistory = [
@@ -18,25 +18,31 @@ export default function DashboardScreen() {
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
   const accent = useThemeColor({}, 'accent');
-  const insets = useSafeAreaInsets();
+  const backgroundColor = useThemeColor({}, 'background');
 
   const totalCues = sessionHistory.reduce((sum, session) => sum + session.cueCount, 0);
   const averageBoost = 14;
   const maxCueCount = Math.max(...sessionHistory.map((s) => s.cueCount));
 
   return (
-    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.content}>
         <ThemedText type="subtitle">Dashboard</ThemedText>
-        <ThemedText style={{ color: muted }}>Track cues, retention, and recent sessions.</ThemedText>
+        <ThemedText style={[Typography.caption, { color: muted }]}>
+          Track cues, retention, and recent sessions.
+        </ThemedText>
 
         <View style={styles.metricsRow}>
           <View style={[styles.metricCard, { backgroundColor: cardColor, borderColor }]}>
-            <ThemedText style={styles.metricLabel}>Total Cues Played</ThemedText>
+            <ThemedText style={[Typography.caption, styles.metricLabel]}>
+              Total Cues Played
+            </ThemedText>
             <ThemedText type="title">{totalCues}</ThemedText>
           </View>
           <View style={[styles.metricCard, { backgroundColor: cardColor, borderColor }]}>
-            <ThemedText style={styles.metricLabel}>Avg Retention Boost</ThemedText>
+            <ThemedText style={[Typography.caption, styles.metricLabel]}>
+              Avg Retention Boost
+            </ThemedText>
             <ThemedText type="title">+{averageBoost}%</ThemedText>
           </View>
         </View>
@@ -44,7 +50,7 @@ export default function DashboardScreen() {
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <View style={styles.cardHeader}>
             <ThemedText type="defaultSemiBold">Recent Sessions</ThemedText>
-            <ThemedText style={{ color: muted }}>Last 5 nights</ThemedText>
+            <ThemedText style={[Typography.caption, { color: muted }]}>Last 5 nights</ThemedText>
           </View>
           <View style={styles.chartRow}>
             {sessionHistory.map((session) => (
@@ -58,7 +64,9 @@ export default function DashboardScreen() {
                     },
                   ]}
                 />
-                <ThemedText style={[styles.chartLabel, { color: muted }]}>{session.date}</ThemedText>
+                <ThemedText style={[Typography.micro, styles.chartLabel, { color: muted }]}>
+                  {session.date}
+                </ThemedText>
               </View>
             ))}
           </View>
@@ -67,7 +75,9 @@ export default function DashboardScreen() {
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <View style={styles.cardHeader}>
             <ThemedText type="defaultSemiBold">Session History</ThemedText>
-            <ThemedText style={{ color: muted }}>Chronological log</ThemedText>
+            <ThemedText style={[Typography.caption, { color: muted }]}>
+              Chronological log
+            </ThemedText>
           </View>
           {sessionHistory.map((session, idx) => (
             <View
@@ -78,19 +88,23 @@ export default function DashboardScreen() {
               ]}>
               <View>
                 <ThemedText type="defaultSemiBold">{session.cueCount} cues</ThemedText>
-                <ThemedText style={{ color: muted }}>{session.date}</ThemedText>
+                <ThemedText style={[Typography.caption, { color: muted }]}>
+                  {session.date}
+                </ThemedText>
               </View>
-              <ThemedText style={{ color: muted }}>🌀 {Math.round(session.cueCount / 5)} items</ThemedText>
+              <ThemedText style={[Typography.caption, { color: muted }]}>
+                🌀 {Math.round(session.cueCount / 5)} items
+              </ThemedText>
             </View>
           ))}
         </View>
       </ScrollView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
   },
   content: {
@@ -108,7 +122,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   metricLabel: {
-    fontSize: 14,
     marginBottom: 8,
   },
   card: {
@@ -138,7 +151,6 @@ const styles = StyleSheet.create({
   },
   chartLabel: {
     marginTop: 8,
-    fontSize: 12,
   },
   historyRow: {
     flexDirection: 'row',

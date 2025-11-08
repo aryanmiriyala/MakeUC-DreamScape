@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 type Question = {
@@ -48,7 +48,7 @@ export default function MorningQuizScreen() {
   const success = useThemeColor({}, 'success');
   const danger = useThemeColor({}, 'danger');
   const accent = useThemeColor({}, 'accent');
-  const insets = useSafeAreaInsets();
+  const backgroundColor = useThemeColor({}, 'background');
 
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -91,22 +91,20 @@ export default function MorningQuizScreen() {
 
   if (complete) {
     return (
-      <ThemedView
-        style={[
-          styles.screen,
-          { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
-        ]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
         <View style={styles.resultCard}>
           <ThemedText type="subtitle">Great job!</ThemedText>
-          <ThemedText style={{ color: muted }}>
+          <ThemedText style={[Typography.body, { color: muted }]}>
             You answered {score} / {questions.length} questions.
           </ThemedText>
           <View style={[styles.boostBubble, { backgroundColor: accent }]}>
-            <ThemedText style={styles.boostText}>Estimated Retention Boost: +{retentionBoost}%</ThemedText>
+            <ThemedText style={[Typography.bodySemi, styles.boostText]}>
+              Estimated Retention Boost: +{retentionBoost}%
+            </ThemedText>
           </View>
           <View style={styles.resultButtons}>
             <TouchableOpacity style={[styles.primaryButton, { backgroundColor: success }]} onPress={resetQuiz}>
-              <ThemedText style={styles.buttonText}>Replay Quiz</ThemedText>
+              <ThemedText style={[Typography.bodySemi, styles.buttonText]}>Replay Quiz</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: cardColor, borderColor, borderWidth: 1 }]}
@@ -115,24 +113,20 @@ export default function MorningQuizScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ThemedView
-      style={[
-        styles.screen,
-        { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
-      ]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Morning Quiz</ThemedText>
-          <ThemedText style={{ color: muted }}>{progressLabel}</ThemedText>
+          <ThemedText style={[Typography.caption, { color: muted }]}>{progressLabel}</ThemedText>
         </View>
 
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <ThemedText style={styles.prompt}>{current.prompt}</ThemedText>
+          <ThemedText style={[Typography.headingMd, styles.prompt]}>{current.prompt}</ThemedText>
 
           {current.options.map((option) => {
             const isSelected = selected === option;
@@ -157,7 +151,7 @@ export default function MorningQuizScreen() {
                 onPress={() => onSelect(option)}>
                 <ThemedText
                   type="defaultSemiBold"
-                  style={{ color: '#ffffff' }}>
+                  style={{ color: isCorrect || isIncorrect ? '#0f1115' : undefined }}>
                   {option}
                 </ThemedText>
               </TouchableOpacity>
@@ -171,18 +165,18 @@ export default function MorningQuizScreen() {
             ]}
             disabled={!answered}
             onPress={onNext}>
-            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.buttonText]}>
               {index === questions.length - 1 ? 'Finish' : 'Next'}
             </ThemedText>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
     padding: 24,
   },
@@ -199,7 +193,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   prompt: {
-    fontSize: 18,
     marginBottom: 8,
   },
   option: {

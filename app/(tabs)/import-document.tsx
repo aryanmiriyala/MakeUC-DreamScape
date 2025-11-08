@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 type FileMeta = {
@@ -35,7 +35,7 @@ export default function ImportDocumentScreen() {
   const muted = useThemeColor({}, 'textSecondary');
   const primary = useThemeColor({}, 'primary');
   const accent = useThemeColor({}, 'accent');
-  const insets = useSafeAreaInsets();
+  const backgroundColor = useThemeColor({}, 'background');
 
   const [selectedFile, setSelectedFile] = useState<FileMeta | null>(null);
   const [cues, setCues] = useState<Cue[]>([]);
@@ -56,11 +56,11 @@ export default function ImportDocumentScreen() {
   };
 
   return (
-    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Import Document</ThemedText>
-          <ThemedText style={[styles.subline, { color: muted }]}>
+          <ThemedText style={[Typography.caption, { color: muted }]}>
             Upload PDFs or TXT files for Gemini to summarize.
           </ThemedText>
         </View>
@@ -69,11 +69,15 @@ export default function ImportDocumentScreen() {
           <ThemedText type="defaultSemiBold">1. Upload file</ThemedText>
           {selectedFile ? (
             <View style={styles.fileRow}>
-              <ThemedText>{selectedFile.name}</ThemedText>
-              <ThemedText style={{ color: muted }}>{selectedFile.type.toUpperCase()}</ThemedText>
+              <ThemedText style={Typography.body}>{selectedFile.name}</ThemedText>
+              <ThemedText style={[Typography.caption, { color: muted }]}>
+                {selectedFile.type.toUpperCase()}
+              </ThemedText>
             </View>
           ) : (
-            <ThemedText style={{ color: muted }}>No file selected yet.</ThemedText>
+            <ThemedText style={[Typography.caption, { color: muted }]}>
+              No file selected yet.
+            </ThemedText>
           )}
 
           <TouchableOpacity style={[styles.outlineButton, { borderColor }]} onPress={pickDocument}>
@@ -90,7 +94,7 @@ export default function ImportDocumentScreen() {
             ]}
             disabled={!selectedFile || isGenerating}
             onPress={generateCues}>
-            <ThemedText type="defaultSemiBold" style={styles.primaryText}>
+            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
               ✨ Generate Cues (Gemini)
             </ThemedText>
           </TouchableOpacity>
@@ -98,7 +102,7 @@ export default function ImportDocumentScreen() {
           {isGenerating && (
             <View style={styles.loadingRow}>
               <ActivityIndicator color={accent} />
-              <ThemedText style={[styles.loadingText, { color: muted }]}>
+              <ThemedText style={[Typography.caption, { color: muted }]}>
                 Summarizing with Gemini…
               </ThemedText>
             </View>
@@ -108,14 +112,16 @@ export default function ImportDocumentScreen() {
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText type="defaultSemiBold">3. Review cues</ThemedText>
           {cues.length === 0 ? (
-            <ThemedText style={{ color: muted }}>
+            <ThemedText style={[Typography.caption, { color: muted }]}>
               Gemini cues will appear here (≤5 words each).
             </ThemedText>
           ) : (
             cues.map((cue) => (
               <View key={cue.id} style={[styles.cueCard, { borderColor }]}>
                 <ThemedText type="defaultSemiBold">“{cue.cue}”</ThemedText>
-                <ThemedText style={{ color: muted }}>{cue.snippet}</ThemedText>
+                <ThemedText style={[Typography.caption, { color: muted }]}>
+                  {cue.snippet}
+                </ThemedText>
               </View>
             ))
           )}
@@ -126,18 +132,18 @@ export default function ImportDocumentScreen() {
               { backgroundColor: primary, opacity: cues.length ? 1 : 0.4 },
             ]}
             disabled={cues.length === 0}>
-            <ThemedText type="defaultSemiBold" style={styles.primaryText}>
+            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
               💾 Save to Topic
             </ThemedText>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
   },
   content: {
@@ -146,9 +152,6 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 4,
-  },
-  subline: {
-    fontSize: 14,
   },
   card: {
     borderWidth: 1,
@@ -179,9 +182,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
   },
   cueCard: {
     borderBottomWidth: 1,

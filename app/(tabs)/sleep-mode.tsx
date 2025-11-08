@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 const intervals = [3, 5, 10] as const;
@@ -14,7 +14,7 @@ export default function SleepModeScreen() {
   const muted = useThemeColor({}, 'textSecondary');
   const success = useThemeColor({}, 'success');
   const danger = useThemeColor({}, 'danger');
-  const insets = useSafeAreaInsets();
+  const backgroundColor = useThemeColor({}, 'background');
 
   const [status, setStatus] = useState<'Ready' | 'Playing' | 'Stopped'>('Ready');
   const [selectedInterval, setSelectedInterval] = useState<(typeof intervals)[number]>(5);
@@ -57,21 +57,19 @@ export default function SleepModeScreen() {
   );
 
   return (
-    <ThemedView
-      style={[
-        styles.screen,
-        { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
-      ]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <View style={styles.content}>
         <ThemedText type="subtitle">Sleep Mode</ThemedText>
-        <ThemedText style={[styles.subtitle, { color: muted }]}>
+        <ThemedText style={[Typography.caption, { color: muted }]}>
           Simulate spaced cues with TTS while resting.
         </ThemedText>
 
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <ThemedText>Status: {status}</ThemedText>
-          <ThemedText style={{ color: muted }}>Cues played: {cuesPlayed}</ThemedText>
-          <Animated.Text style={[styles.pulseText, { color: muted }, pulseStyle]}>
+          <ThemedText style={Typography.body}>Status: {status}</ThemedText>
+          <ThemedText style={[Typography.body, { color: muted }]}>
+            Cues played: {cuesPlayed}
+          </ThemedText>
+          <Animated.Text style={[Typography.caption, styles.pulseText, { color: muted }, pulseStyle]}>
             💤 Reinforcing memories…
           </Animated.Text>
         </View>
@@ -110,7 +108,7 @@ export default function SleepModeScreen() {
             style={[styles.primaryButton, { backgroundColor: success }]}
             onPress={startSession}
             disabled={status === 'Playing'}>
-            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.buttonText]}>
               Start Sleep Session
             </ThemedText>
           </TouchableOpacity>
@@ -118,26 +116,23 @@ export default function SleepModeScreen() {
             style={[styles.primaryButton, { backgroundColor: danger }]}
             onPress={stopSession}
             disabled={status !== 'Playing'}>
-            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.buttonText]}>
               Stop
             </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
     padding: 24,
   },
   content: {
     gap: 16,
-  },
-  subtitle: {
-    fontSize: 14,
   },
   card: {
     borderWidth: 1,
