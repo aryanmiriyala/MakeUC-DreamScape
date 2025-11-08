@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -20,6 +21,8 @@ type Topic = {
   cueCount: number;
   cards: number;
 };
+
+const LOGO_MARK = require('@/assets/images/logo-no-letters.png');
 
 const actions = [
   {
@@ -91,7 +94,10 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <ThemedText type="title">Dreamscape 🌙</ThemedText>
+          <View style={styles.logoRow}>
+            <Image source={LOGO_MARK} style={styles.logoMark} resizeMode="contain" />
+            <ThemedText type="title">DreamScape</ThemedText>
+          </View>
           <ThemedText style={[Typography.body, { color: mutedText }]}>
             Nightly microlearning, tailored to you.
           </ThemedText>
@@ -202,6 +208,15 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 8,
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoMark: {
+    width: 48,
+    height: 48,
   },
   actionsWrapper: {
     gap: 12,

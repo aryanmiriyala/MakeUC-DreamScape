@@ -1,8 +1,17 @@
-# Welcome to your Expo app 👋
+# DreamScape
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![DreamScape logo](assets/images/icon.png)
 
-## Get started
+DreamScape is a nightly microlearning companion that helps you capture ideas before bed, listen to gentle “sleep mode” prompts while you rest, and review the highlights in the morning. The project is built with Expo Router, TypeScript, and a composable store/async storage layer so it can scale from a hackathon experiment into a polished cross-platform app.
+
+## Highlights
+
+- 🎯 **Personalized topics** – curate flashcards and cues for the areas you want to sharpen.
+- 🌙 **Sleep-friendly UI** – soft gradients, haptic tabs, and dark-mode aware theming.
+- 💤 **Bedtime flow** – add items, enable Sleep Mode, then review the retention dashboard when you wake up.
+- ⚙️ **Typed architecture** – Zustand stores, Zod models, and shared UI primitives keep things reliable.
+
+## Getting started
 
 1. Install dependencies
 
@@ -10,41 +19,33 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Run the development server
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+3. Launch the platform of your choice from the Expo CLI output (iOS simulator, Android emulator, web, or Expo Go).
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+The routed screens live under the `app/` directory. Modify `app/(tabs)` and the supporting components/stores to evolve product flows.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Branding
 
-## Get a fresh project
+All DreamScape branding assets live in `assets/images/`:
 
-When you're ready, run:
+- `icon.png` – primary square logo (also used for splash and favicon variants).
+- `android-icon-background.png` / `android-icon-foreground.png` / `android-icon-monochrome.png` – adaptive icon layers.
+- `splash-icon.png` – Expo splash screen artwork.
 
-```bash
-npm run reset-project
-```
+Update these files if you tweak the color palette or illustration; Expo will automatically pick up the new assets.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Project scripts
 
-## Learn more
+- `npm run lint` – check for lint issues
+- `npm run reset-project` – restore the Expo starter state if you ever need a clean slate
 
-To learn more about developing your project with Expo, look at the following resources:
+## Useful references
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Expo Router docs](https://docs.expo.dev/router/introduction/)
+- [Expo Application Services](https://expo.dev/eas)
+- [Zustand state management](https://github.com/pmndrs/zustand)
