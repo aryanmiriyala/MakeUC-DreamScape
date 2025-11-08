@@ -5,25 +5,44 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const darkPalette = {
+  background: '#0f1115',
+  card: '#1b1f2a',
+  primary: '#3b82f6',
+  success: '#22c55e',
+  danger: '#ef4444',
+  text: '#ffffff',
+  textSecondary: '#cbd5e1',
+  accent: '#6366f1',
+  border: '#2a3246',
+};
+
+const lightPalette = {
+  background: '#f5f7fb',
+  card: '#ffffff',
+  primary: '#2563eb',
+  success: '#16a34a',
+  danger: '#dc2626',
+  text: '#111827',
+  textSecondary: '#475569',
+  accent: '#7c3aed',
+  border: '#dbe0f0',
+};
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    ...lightPalette,
+    tint: lightPalette.primary,
+    icon: lightPalette.textSecondary,
+    tabIconDefault: '#94a3b8',
+    tabIconSelected: lightPalette.primary,
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    ...darkPalette,
+    tint: darkPalette.primary,
+    icon: darkPalette.textSecondary,
+    tabIconDefault: '#64748b',
+    tabIconSelected: darkPalette.primary,
   },
 };
 
