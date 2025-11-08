@@ -85,6 +85,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     fontSize: 16,
+    color: '#ffffff',
   },
   button: {
     width: '100%',
