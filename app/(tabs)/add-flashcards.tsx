@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -51,6 +52,7 @@ export default function AddFlashcardsScreen() {
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
   const primary = useThemeColor({}, 'primary');
+  const insets = useSafeAreaInsets();
 
   const [topicFlashcards, setTopicFlashcards] = useState<Record<string, Flashcard[]>>(initialFlashcards);
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
@@ -100,8 +102,9 @@ export default function AddFlashcardsScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Topics</ThemedText>
           <ThemedText style={{ color: muted }}>
@@ -124,7 +127,7 @@ export default function AddFlashcardsScreen() {
       </ScrollView>
 
       <Modal visible={Boolean(activeTopicId)} transparent animationType="slide" onRequestClose={closeModal}>
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
           <View style={[styles.modalCard, { backgroundColor: cardColor, borderColor }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="subtitle">{topicName}</ThemedText>

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,10 +19,11 @@ export default function HomeScreen() {
   const mutedText = useThemeColor({}, 'textSecondary');
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
+  const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
         <View style={styles.header}>
           <ThemedText type="title">Dreamscape 🌙</ThemedText>
           <ThemedText style={[styles.tagline, { color: mutedText }]}>

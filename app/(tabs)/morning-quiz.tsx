@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -47,6 +48,7 @@ export default function MorningQuizScreen() {
   const success = useThemeColor({}, 'success');
   const danger = useThemeColor({}, 'danger');
   const accent = useThemeColor({}, 'accent');
+  const insets = useSafeAreaInsets();
 
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -89,7 +91,11 @@ export default function MorningQuizScreen() {
 
   if (complete) {
     return (
-      <ThemedView style={styles.screen}>
+      <ThemedView
+        style={[
+          styles.screen,
+          { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
+        ]}>
         <View style={styles.resultCard}>
           <ThemedText type="subtitle">Great job!</ThemedText>
           <ThemedText style={{ color: muted }}>
@@ -114,7 +120,11 @@ export default function MorningQuizScreen() {
   }
 
   return (
-    <ThemedView style={styles.screen}>
+    <ThemedView
+      style={[
+        styles.screen,
+        { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
+      ]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Morning Quiz</ThemedText>

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -34,6 +35,7 @@ export default function ImportDocumentScreen() {
   const muted = useThemeColor({}, 'textSecondary');
   const primary = useThemeColor({}, 'primary');
   const accent = useThemeColor({}, 'accent');
+  const insets = useSafeAreaInsets();
 
   const [selectedFile, setSelectedFile] = useState<FileMeta | null>(null);
   const [cues, setCues] = useState<Cue[]>([]);
@@ -54,8 +56,8 @@ export default function ImportDocumentScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Import Document</ThemedText>
           <ThemedText style={[styles.subline, { color: muted }]}>

@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -17,14 +18,15 @@ export default function DashboardScreen() {
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
   const accent = useThemeColor({}, 'accent');
+  const insets = useSafeAreaInsets();
 
   const totalCues = sessionHistory.reduce((sum, session) => sum + session.cueCount, 0);
   const averageBoost = 14;
   const maxCueCount = Math.max(...sessionHistory.map((s) => s.cueCount));
 
   return (
-    <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
         <ThemedText type="subtitle">Dashboard</ThemedText>
         <ThemedText style={{ color: muted }}>Track cues, retention, and recent sessions.</ThemedText>
 

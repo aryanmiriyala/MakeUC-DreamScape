@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -13,6 +14,7 @@ export default function SleepModeScreen() {
   const muted = useThemeColor({}, 'textSecondary');
   const success = useThemeColor({}, 'success');
   const danger = useThemeColor({}, 'danger');
+  const insets = useSafeAreaInsets();
 
   const [status, setStatus] = useState<'Ready' | 'Playing' | 'Stopped'>('Ready');
   const [selectedInterval, setSelectedInterval] = useState<(typeof intervals)[number]>(5);
@@ -55,7 +57,11 @@ export default function SleepModeScreen() {
   );
 
   return (
-    <ThemedView style={styles.screen}>
+    <ThemedView
+      style={[
+        styles.screen,
+        { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
+      ]}>
       <View style={styles.content}>
         <ThemedText type="subtitle">Sleep Mode</ThemedText>
         <ThemedText style={[styles.subtitle, { color: muted }]}>
