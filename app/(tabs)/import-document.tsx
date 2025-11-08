@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +15,9 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 
 type FileMeta = {
   name: string;
-  type: 'pdf' | 'txt';
+  uri: string;
+  mimeType: 'application/pdf' | 'text/plain';
+  size?: number | null;
 };
 
 type Cue = {
@@ -40,10 +43,57 @@ export default function ImportDocumentScreen() {
   const [selectedFile, setSelectedFile] = useState<FileMeta | null>(null);
   const [cues, setCues] = useState<Cue[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
 
-  const pickDocument = () => {
-    setSelectedFile({ name: 'Sleep-Science-Notes.pdf', type: 'pdf' });
-    setCues([]);
+  const pickDocument = async () => {
+    setPickerError(null);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/plain'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      const canceled = 'canceled' in result ? result.canceled : result.type === 'cancel';
+      if (canceled) {
+        return;
+      }
+
+      const asset =
+        'assets' in result
+          ? result.assets?.[0]
+          : ({
+              uri: result.uri,
+              name: result.name,
+              size: result.size,
+              mimeType: result.mimeType,
+            } as DocumentPicker.DocumentPickerAsset);
+
+      if (!asset) {
+        setPickerError('Unable to read selected file.');
+        return;
+      }
+
+      const inferredMime =
+        (asset.mimeType as FileMeta['mimeType'] | undefined) ??
+        (asset.name?.toLowerCase().endsWith('.txt') ? 'text/plain' : 'application/pdf');
+
+      if (inferredMime !== 'application/pdf' && inferredMime !== 'text/plain') {
+        setPickerError('Please select a PDF or TXT file.');
+        return;
+      }
+
+      setSelectedFile({
+        name: asset.name ?? 'Untitled document',
+        uri: asset.uri,
+        mimeType: inferredMime,
+        size: asset.size,
+      });
+      setCues([]);
+    } catch (error) {
+      console.error('Document picker error', error);
+      setPickerError('Unable to open file. Please try again.');
+    }
   };
 
   const generateCues = () => {
@@ -71,7 +121,8 @@ export default function ImportDocumentScreen() {
             <View style={styles.fileRow}>
               <ThemedText style={Typography.body}>{selectedFile.name}</ThemedText>
               <ThemedText style={[Typography.caption, { color: muted }]}>
-                {selectedFile.type.toUpperCase()}
+                {selectedFile.mimeType === 'application/pdf' ? 'PDF' : 'TXT'}
+                {selectedFile.size ? ` • ${(selectedFile.size / 1024).toFixed(0)} KB` : ''}
               </ThemedText>
             </View>
           ) : (
@@ -83,6 +134,11 @@ export default function ImportDocumentScreen() {
           <TouchableOpacity style={[styles.outlineButton, { borderColor }]} onPress={pickDocument}>
             <ThemedText type="defaultSemiBold">📄 Choose Document</ThemedText>
           </TouchableOpacity>
+          {pickerError && (
+            <ThemedText style={[Typography.caption, styles.errorText, { color: accent }]}>
+              {pickerError}
+            </ThemedText>
+          )}
         </View>
 
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
@@ -186,5 +242,8 @@ const styles = StyleSheet.create({
   cueCard: {
     borderBottomWidth: 1,
     paddingVertical: 10,
+  },
+  errorText: {
+    marginTop: 8,
   },
 });
