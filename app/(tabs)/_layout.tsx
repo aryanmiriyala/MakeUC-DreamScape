@@ -6,6 +6,15 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+const tabConfig = [
+  { name: 'index', title: 'Home', icon: 'house.fill' },
+  { name: 'add-flashcards', title: 'Flashcards', icon: 'square.stack.3d.up.fill' },
+  { name: 'import-document', title: 'Import', icon: 'doc.text.fill' },
+  { name: 'sleep-mode', title: 'Sleep', icon: 'bed.double.fill' },
+  { name: 'morning-quiz', title: 'Quiz', icon: 'sun.max.fill' },
+  { name: 'dashboard', title: 'Dashboard', icon: 'chart.bar.xaxis' },
+] as const;
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
@@ -16,20 +25,18 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
+      {tabConfig.map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={26} name={tab.icon} color={color} />
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
