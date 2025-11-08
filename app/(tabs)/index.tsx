@@ -1,24 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import {
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  type ListRenderItem,
-} from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeColor } from '@/hooks/use-theme-color';
-
-type Topic = {
-  id: string;
-  name: string;
-  cueCount: number;
-  cards: number;
-};
 
 const actions = [
   { label: '+ New Topic', route: '/add-flashcards', tone: 'primary' },
@@ -31,28 +16,8 @@ const actions = [
 export default function HomeScreen() {
   const router = useRouter();
   const mutedText = useThemeColor({}, 'textSecondary');
-  const [topics] = useState<Topic[]>([
-    { id: '1', name: 'Photosynthesis', cards: 18, cueCount: 54 },
-    { id: '2', name: 'Spanish Basics', cards: 25, cueCount: 40 },
-    { id: '3', name: 'AWS Study', cards: 12, cueCount: 30 },
-  ]);
-
-  const renderTopic: ListRenderItem<Topic> = ({ item }) => (
-    <TopicCard
-      title={item.name}
-      subtitle={`${item.cards} cards • ${item.cueCount} cues`}
-      onPress={() => router.push({ pathname: '/add-flashcards', params: { topicId: item.id } })}
-    />
-  );
-
-  const emptyState = useMemo(
-    () => (
-      <ThemedText style={[styles.emptyText, { color: mutedText }]}>
-        No topics yet. Tap + New Topic to begin!
-      </ThemedText>
-    ),
-    [mutedText]
-  );
+  const cardColor = useThemeColor({}, 'card');
+  const borderColor = useThemeColor({}, 'border');
 
   return (
     <ThemedView style={styles.screen}>
@@ -66,26 +31,22 @@ export default function HomeScreen() {
 
         <View style={styles.actionsWrapper}>
           {actions.map((action) => (
-            <ActionButton key={action.label} label={action.label} tone={action.tone} onPress={() => router.push(action.route)} />
+            <ActionButton
+              key={action.label}
+              label={action.label}
+              tone={action.tone}
+              onPress={() => router.push(action.route)}
+            />
           ))}
         </View>
 
-        <View style={styles.sectionHeader}>
-          <ThemedText type="subtitle">Topics</ThemedText>
-          <ThemedText style={[styles.sectionHint, { color: mutedText }]}>
-            Tap a topic to add flashcards or cues.
+        <View style={[styles.missionCard, { backgroundColor: cardColor, borderColor }]}>
+          <ThemedText type="subtitle">Evening Routine</ThemedText>
+          <ThemedText style={[styles.cardText, { color: mutedText }]}>
+            1. Import docs or add flashcards{'\n'}2. Run Sleep Mode cues{'\n'}3. Take Morning
+            Quiz{'\n'}4. Review progress on the Dashboard
           </ThemedText>
         </View>
-
-        <FlatList
-          data={topics}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTopic}
-          scrollEnabled={false}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={emptyState}
-          contentContainerStyle={topics.length === 0 ? styles.emptyWrapper : undefined}
-        />
       </ScrollView>
     </ThemedView>
   );
@@ -111,27 +72,6 @@ const ActionButton = ({ label, onPress, tone }: ActionButtonProps) => {
       <ThemedText type="defaultSemiBold" style={styles.actionText}>
         {label}
       </ThemedText>
-    </TouchableOpacity>
-  );
-};
-
-type TopicCardProps = {
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-};
-
-const TopicCard = ({ title, subtitle, onPress }: TopicCardProps) => {
-  const cardColor = useThemeColor({}, 'card');
-  const borderColor = useThemeColor({}, 'border');
-  const muted = useThemeColor({}, 'textSecondary');
-
-  return (
-    <TouchableOpacity
-      style={[styles.topicCard, { backgroundColor: cardColor, borderColor }]}
-      onPress={onPress}>
-      <ThemedText type="defaultSemiBold">{title}</ThemedText>
-      <ThemedText style={[styles.topicMeta, { color: muted }]}>{subtitle}</ThemedText>
     </TouchableOpacity>
   );
 };
@@ -165,28 +105,13 @@ const styles = StyleSheet.create({
   actionText: {
     color: '#ffffff',
   },
-  sectionHeader: {
-    gap: 4,
-  },
-  sectionHint: {
-    fontSize: 14,
-  },
-  topicCard: {
-    padding: 16,
+  missionCard: {
     borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
   },
-  topicMeta: {
+  cardText: {
     marginTop: 8,
-  },
-  separator: {
-    height: 12,
-  },
-  emptyWrapper: {
-    paddingVertical: 24,
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 14,
+    lineHeight: 22,
   },
 });

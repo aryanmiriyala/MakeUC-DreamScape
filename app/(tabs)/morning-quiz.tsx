@@ -147,7 +147,7 @@ export default function MorningQuizScreen() {
                 onPress={() => onSelect(option)}>
                 <ThemedText
                   type="defaultSemiBold"
-                  style={{ color: isCorrect || isIncorrect ? '#0f1115' : undefined }}>
+                  style={{ color: '#ffffff' }}>
                   {option}
                 </ThemedText>
               </TouchableOpacity>
