@@ -35,6 +35,8 @@ export default function TabLayout() {
           }}
         />
       ))}
+      <Tabs.Screen name="import-document" options={{ href: null }} />
+      <Tabs.Screen name="morning-quiz" options={{ href: null }} />
     </Tabs>
   );
 }

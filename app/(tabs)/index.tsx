@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  useWindowDimensions,
   type ListRenderItem,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,7 +50,6 @@ const actions = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
   const mutedText = useThemeColor({}, 'textSecondary');
   const backgroundColor = useThemeColor({}, 'background');
   const highlightBackground = useThemeColor({ light: '#f0f4ff', dark: '#1b1f2a' }, 'card');
@@ -81,13 +79,13 @@ export default function HomeScreen() {
   );
 
   const actionsPerRow = 2;
-  const horizontalPadding = 24;
-  const gutter = 12;
-  const cardWidth = useMemo(() => {
-    const available = Math.max(screenWidth - horizontalPadding * 2, 0);
-    const computed = (available - gutter * (actionsPerRow - 1)) / actionsPerRow;
-    return Math.max(computed, 150);
-  }, [screenWidth]);
+  const actionRows = useMemo(() => {
+    const rows: typeof actions[] = [];
+    for (let i = 0; i < actions.length; i += actionsPerRow) {
+      rows.push(actions.slice(i, i + actionsPerRow));
+    }
+    return rows;
+  }, []);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
@@ -100,22 +98,21 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.actionsWrapper}>
-          {actions.map((action, index) => (
-            <View
-              key={action.label}
-              style={[
-                styles.actionSlot,
-                {
-                  width: cardWidth,
-                  marginRight: index % actionsPerRow === 0 ? gutter : 0,
-                },
-              ]}>
-              <ActionButton
-                label={action.label}
-                description={action.description}
-                color={action.color}
-                onPress={() => router.push(action.route)}
-              />
+          {actionRows.map((row, rowIndex) => (
+            <View key={`row-${rowIndex}`} style={styles.actionsRow}>
+              {row.map((action) => (
+                <ActionButton
+                  key={action.label}
+                  label={action.label}
+                  description={action.description}
+                  color={action.color}
+                  onPress={() => router.push(action.route)}
+                />
+              ))}
+              {row.length < actionsPerRow &&
+                Array.from({ length: actionsPerRow - row.length }).map((_, idx) => (
+                  <View key={`spacer-${rowIndex}-${idx}`} style={[styles.actionButton, styles.actionSpacer]} />
+                ))}
             </View>
           ))}
         </View>
@@ -207,14 +204,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionsWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 12,
+    flexDirection: 'column',
   },
-  actionSlot: {
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 12,
   },
   actionButton: {
-    width: '100%',
+    flex: 1,
+    minWidth: 0,
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 18,
@@ -225,6 +225,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 6,
+  },
+  actionSpacer: {
+    opacity: 0,
   },
   actionTitle: {
     color: '#ffffff',
