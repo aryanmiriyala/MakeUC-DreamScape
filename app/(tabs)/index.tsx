@@ -23,21 +23,21 @@ type Topic = {
 
 const actions = [
   {
-    label: 'New Topic',
-    description: 'Capture flashcards manually',
-    route: '/add-flashcards',
-    color: '#2a2f3a',
-  },
-  {
     label: 'Flashcards',
     description: 'Edit cues & answers',
     route: '/add-flashcards',
     color: '#2a2f3a',
   },
   {
-    label: 'Sleep Mode',
-    description: 'Run cue sessions',
-    route: '/sleep-mode',
+    label: 'Import Document',
+    description: 'Summarize PDFs or text',
+    route: '/import-document',
+    color: '#2a2f3a',
+  },
+  {
+    label: 'Morning Quiz',
+    description: 'Reinforce what stuck',
+    route: '/morning-quiz',
     color: '#2a2f3a',
   },
   {
