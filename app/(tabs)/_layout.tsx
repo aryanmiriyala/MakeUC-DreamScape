@@ -9,9 +9,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 const tabConfig = [
   { name: 'index', title: 'Home', icon: 'house.fill' },
   { name: 'add-flashcards', title: 'Flashcards', icon: 'square.stack.3d.up.fill' },
-  { name: 'import-document', title: 'Import', icon: 'doc.text.fill' },
   { name: 'sleep-mode', title: 'Sleep', icon: 'bed.double.fill' },
-  { name: 'morning-quiz', title: 'Quiz', icon: 'sun.max.fill' },
   { name: 'dashboard', title: 'Dashboard', icon: 'chart.bar.xaxis' },
 ] as const;
 

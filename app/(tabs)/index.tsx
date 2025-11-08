@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  useWindowDimensions,
   type ListRenderItem,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,9 +30,9 @@ const actions = [
     color: '#2a2f3a',
   },
   {
-    label: 'Import Document',
-    description: 'Summarize PDFs or text',
-    route: '/import-document',
+    label: 'Flashcards',
+    description: 'Edit cues & answers',
+    route: '/add-flashcards',
     color: '#2a2f3a',
   },
   {
@@ -41,15 +42,16 @@ const actions = [
     color: '#2a2f3a',
   },
   {
-    label: 'Morning Quiz',
-    description: 'Reinforce retention',
-    route: '/morning-quiz',
+    label: 'Dashboard',
+    description: 'Review cue stats',
+    route: '/dashboard',
     color: '#2a2f3a',
   },
 ] as const;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const mutedText = useThemeColor({}, 'textSecondary');
   const backgroundColor = useThemeColor({}, 'background');
   const highlightBackground = useThemeColor({ light: '#f0f4ff', dark: '#1b1f2a' }, 'card');
@@ -78,6 +80,15 @@ export default function HomeScreen() {
     [mutedText]
   );
 
+  const actionsPerRow = 2;
+  const horizontalPadding = 24;
+  const gutter = 12;
+  const cardWidth = useMemo(() => {
+    const available = Math.max(screenWidth - horizontalPadding * 2, 0);
+    const computed = (available - gutter * (actionsPerRow - 1)) / actionsPerRow;
+    return Math.max(computed, 150);
+  }, [screenWidth]);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -89,22 +100,33 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.actionsWrapper}>
-          {actions.map((action) => (
-            <ActionButton
+          {actions.map((action, index) => (
+            <View
               key={action.label}
-              label={action.label}
-              description={action.description}
-              color={action.color}
-              onPress={() => router.push(action.route)}
-            />
+              style={[
+                styles.actionSlot,
+                {
+                  width: cardWidth,
+                  marginRight: index % actionsPerRow === 0 ? gutter : 0,
+                },
+              ]}>
+              <ActionButton
+                label={action.label}
+                description={action.description}
+                color={action.color}
+                onPress={() => router.push(action.route)}
+              />
+            </View>
           ))}
         </View>
 
-        <View style={[styles.highlightCard, { backgroundColor: highlightBackground, borderColor: highlightBorder }]}>
+        <View
+          style={[styles.highlightCard, { backgroundColor: highlightBackground, borderColor: highlightBorder }]}
+        >
           <ThemedText type="subtitle">Evening Flow</ThemedText>
           <ThemedText style={[Typography.body, { color: highlightCopy }]}>
-            Import study materials, let Sleep Mode whisper cues, then take a Morning Quiz to lock
-            things in.
+            Add fresh flashcards, let Sleep Mode whisper cues while you rest, then review the
+            dashboard to see what stuck.
           </ThemedText>
         </View>
 
@@ -187,13 +209,12 @@ const styles = StyleSheet.create({
   actionsWrapper: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
-    justifyContent: 'space-between',
+  },
+  actionSlot: {
+    marginBottom: 12,
   },
   actionButton: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    width: '48%',
+    width: '100%',
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 18,
