@@ -12,7 +12,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useTopicStore } from '@/store/topicStore';
 
-const LOGO_MARK = require('@/assets/images/logo-no-letters.png');
+const LOGO_MARK = require('@/assets/images/logo-no-letters-removebg-preview.png');
 
 const actions = [
   {
@@ -198,8 +198,10 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   logoMark: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    overflow: 'hidden',
   },
   heroCard: {
     borderRadius: 26,
