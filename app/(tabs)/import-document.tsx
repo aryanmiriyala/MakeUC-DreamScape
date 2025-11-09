@@ -16,10 +16,10 @@ import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { cardSurface } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
+import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { summarizeDocumentWithGemini } from '@/lib/gemini';
 import { generateId, putDocument } from '@/lib/storage';
-import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useTopicStore } from '@/store/topicStore';
 
 const SUPPORTED_MIME_TYPES = ['application/pdf', 'text/plain'] as const;
@@ -64,6 +64,7 @@ export default function ImportDocumentScreen() {
 
   const addTopic = useTopicStore((state) => state.addTopic);
   const addItem = useTopicStore((state) => state.addItem);
+  const addCue = useTopicStore((state) => state.addCue);
 
   useFocusEffect(
     useCallback(() => {
@@ -227,17 +228,23 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
         description: `Imported from ${selectedFile.name}`,
       });
 
-      await Promise.all(
-        cues.map((cue, index) =>
-          addItem(topic.id, {
-            front: cue.cue || `Cue ${index + 1}`,
-            back: cue.snippet || cue.cue || 'Generated cue',
-            cueText: cue.cue || cue.snippet || 'Cue',
-          })
-        )
-      );
+      // Create items and their associated cues
+      for (let index = 0; index < cues.length; index++) {
+        const cue = cues[index];
+        const cueText = cue.cue || `Cue ${index + 1}`;
+        
+        // Create the item
+        const item = await addItem(topic.id, {
+          front: cueText,
+          back: cue.snippet || cueText || 'Generated cue',
+          cueText: cueText, // Keep cueText on item for backwards compatibility
+        });
 
-      setTopicStatus('Topic saved! Check Home, Flashcards, or Sleep Mode.');
+        // Create the actual Cue object (this is what Sleep Mode needs!)
+        await addCue(item.id, cueText);
+      }
+
+      setTopicStatus(`Topic saved with ${cues.length} flashcards and cues! Check Sleep Mode.`);
     } catch (error) {
       console.error('Failed to save topic', error);
       setTopicStatus(

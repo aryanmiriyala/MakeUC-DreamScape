@@ -128,3 +128,126 @@ function sanitizeMimeType(mime: string): string {
   }
   return 'text/plain';
 }
+
+export type QuizQuestion = {
+  id: string;
+  prompt: string;
+  options: string[];
+  answer: string;
+};
+
+export type GenerateQuizParams = {
+  cues: Array<{ cue: string; snippet: string }>;
+  numQuestions?: number;
+};
+
+/**
+ * Generate quiz questions based on sleep cues using Gemini
+ */
+export async function generateQuizFromCues({
+  cues,
+  numQuestions = 5,
+}: GenerateQuizParams): Promise<QuizQuestion[]> {
+  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? process.env.EXPO_PUBLIC_GEMINI_KEY;
+
+  if (!apiKey) {
+    throw new Error('Missing Gemini API key. Set EXPO_PUBLIC_GEMINI_API_KEY in your env.');
+  }
+
+  if (!cues || cues.length === 0) {
+    throw new Error('No cues provided to generate quiz questions');
+  }
+
+  // Format cues for the prompt
+  const cueText = cues
+    .map((c, idx) => `${idx + 1}. Cue: "${c.cue}" - Context: ${c.snippet}`)
+    .join('\n');
+
+  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      generation_config: {
+        temperature: 0.7,
+        top_p: 0.95,
+        max_output_tokens: 1024,
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `You are a quiz generator. Based on the following learning cues from a sleep study session, generate ${numQuestions} multiple-choice questions to test retention.
+
+Learning Cues:
+${cueText}
+
+Requirements:
+- Each question should test understanding of the concepts in the cues
+- Provide 4 options per question (one correct, three plausible distractors)
+- Questions should be clear and concise
+- Mix question types (recall, comprehension, application)
+
+Return ONLY valid JSON in this exact format:
+{
+  "questions": [
+    {
+      "prompt": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "answer": "The correct option text (must match one of the options exactly)"
+    }
+  ]
+}`,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.text();
+    throw new Error(`Gemini quiz generation failed (${response.status}): ${errorPayload}`);
+  }
+
+  const payload = await response.json();
+  const textResponse = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!textResponse) {
+    throw new Error('Gemini returned an empty response for quiz generation.');
+  }
+
+  const sanitized = sanitizeGeminiJson(textResponse);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(sanitized);
+  } catch {
+    throw new Error('Gemini quiz response was not valid JSON.');
+  }
+
+  const questions = (parsed as any)?.questions;
+
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error('Gemini response did not include valid questions array.');
+  }
+
+  return questions
+    .map((q: any, index: number) => ({
+      id: generateId(`quiz${index}`),
+      prompt: typeof q?.prompt === 'string' ? q.prompt.trim() : '',
+      options: Array.isArray(q?.options) ? q.options.map((opt: any) => String(opt).trim()) : [],
+      answer: typeof q?.answer === 'string' ? q.answer.trim() : '',
+    }))
+    .filter(
+      (q: QuizQuestion) =>
+        q.prompt.length > 0 &&
+        q.options.length === 4 &&
+        q.answer.length > 0 &&
+        q.options.includes(q.answer)
+    )
+    .slice(0, numQuestions);
+}
+
