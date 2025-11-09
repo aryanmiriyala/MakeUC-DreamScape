@@ -235,21 +235,6 @@ export default function SettingsScreen() {
               trackColor={{ false: borderColor, true: accent }}
             />
           </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <ThemedText>Dark Mode</ThemedText>
-              <ThemedText style={[Typography.caption, { color: muted }]}>
-                Use dark theme (Coming soon)
-              </ThemedText>
-            </View>
-            <Switch
-              value={darkModeEnabled}
-              onValueChange={setDarkModeEnabled}
-              trackColor={{ false: borderColor, true: accent }}
-              disabled
-            />
-          </View>
         </View>
 
         {/* About Section */}
