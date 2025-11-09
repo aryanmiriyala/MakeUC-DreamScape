@@ -29,7 +29,7 @@ interface TopicStoreState {
   cues: Record<string, Cue>;
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
-  addTopic: (payload: { name: string; description?: string; tags?: string[] }) => Promise<Topic>;
+  addTopic: (payload: { name: string; description?: string; tags?: string[]; shortName?: string }) => Promise<Topic>;
   updateTopic: (
     topicId: string,
     updates: Partial<Omit<Topic, 'id' | 'createdAt' | 'updatedAt'>>,
@@ -87,9 +87,9 @@ export const useTopicStore = create<TopicStoreState>((set, get) => ({
     }
   },
 
-  addTopic: async ({ name, description, tags = [] }) => {
+  addTopic: async ({ name, description, tags = [], shortName }) => {
     try {
-      const topic = createTopicPayload(name, description, tags);
+      const topic = createTopicPayload(name, description, tags, shortName);
       await putTopic(topic);
 
       set((state) => ({

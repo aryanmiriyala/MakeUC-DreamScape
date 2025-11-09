@@ -18,7 +18,6 @@ import { useSleepStore } from '@/store/sleepStore';
 import { useTopicStore } from '@/store/topicStore';
 import { useStoreInitializer } from '../../hooks/use-store-initializer';
 
-const intervals = [3, 5, 10] as const;
 const AMBIENT_OPTIONS: Array<{ key: AmbientPreset | 'none'; label: string; emoji: string }> = [
   { key: 'none', label: 'No Music', emoji: '🔇' },
   { key: 'lofi', label: 'Lo-Fi', emoji: '🎵' },
@@ -28,6 +27,23 @@ const AMBIENT_OPTIONS: Array<{ key: AmbientPreset | 'none'; label: string; emoji
   { key: 'piano', label: 'Piano', emoji: '🎹' },
   { key: 'white_noise', label: 'White Noise', emoji: '⚪' },
 ];
+
+const VOICE_OPTIONS = [
+  { id: 'Qggl4b0xRMiqOwhPtVWT', label: 'Clara' },
+  { id: 'uhYnkYTBc711oAY590Ea', label: 'Charlotte' },
+  { id: 'CsCH98UfIgwEiNogGKjk', label: 'Sean' },
+  { id: 'n8whxsxd0DgU7GRem9k9', label: 'Bruno' },
+] as const;
+
+const VOICE_SAMPLE_TEXT = 'Hi! Thanks for checking out DreamScape.';
+
+function chunkOptions<T>(options: T[], size = 2): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < options.length; index += size) {
+    chunks.push(options.slice(index, index + size));
+  }
+  return chunks;
+}
 
 type SessionStatus = 'idle' | 'preparing' | 'playing';
 
@@ -47,6 +63,11 @@ export default function SleepModeScreen() {
   const muted = useThemeColor({}, 'textSecondary');
   const success = useThemeColor({}, 'success');
   const danger = useThemeColor({}, 'danger');
+  const activeSurface = useThemeColor({ light: '#41485f', dark: '#23283a' }, 'card');
+  const inactiveSurface = useThemeColor({ light: '#f7f8fb', dark: '#1a1d27' }, 'card');
+  const activeTextColor = '#f8fafc';
+  const inactiveTextColor = '#0f1115';
+  const optionTextColor = '#f8fafc';
   const insets = useSafeAreaInsets();
 
   useStoreInitializer(useTopicStore);
@@ -63,17 +84,20 @@ export default function SleepModeScreen() {
   const cancelSession = useSleepStore((state) => state.cancelSession);
 
   const [status, setStatus] = useState<SessionStatus>('idle');
-  const [selectedInterval, setSelectedInterval] = useState<(typeof intervals)[number]>(5);
+  const [selectedInterval] = useState(5);
   const [cuesPlayed, setCuesPlayed] = useState(0);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedAmbient, setSelectedAmbient] = useState<AmbientPreset | 'none'>('lofi');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(VOICE_OPTIONS[0].id);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [preparedCues, setPreparedCues] = useState<PreparedCue[]>([]);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const ambientSoundRef = useRef<Audio.Sound | null>(null);
+  const previewSoundRef = useRef<Audio.Sound | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const statusRef = useRef<SessionStatus>('idle');
   const preparedRef = useRef<PreparedCue[]>([]);
@@ -181,6 +205,11 @@ export default function SleepModeScreen() {
       await ambientSoundRef.current.unloadAsync();
       ambientSoundRef.current = null;
     }
+    if (previewSoundRef.current) {
+      await previewSoundRef.current.unloadAsync();
+      previewSoundRef.current = null;
+    }
+    setIsPreviewingVoice(false);
   }, []);
 
   const stopSleepSession = useCallback(
@@ -319,7 +348,7 @@ export default function SleepModeScreen() {
       const prepared: PreparedCue[] = [];
 
       for (const cue of cueSources) {
-        const audio = await fetchCueAudio(cue.text);
+        const audio = await fetchCueAudio(cue.text, { voiceId: selectedVoiceId });
         prepared.push({ ...cue, uri: audio.uri });
       }
 
@@ -378,12 +407,45 @@ export default function SleepModeScreen() {
     } finally {
       setIsPreparing(false);
     }
-  }, [cueSources, playCueAtIndex, selectedAmbient, selectedInterval, selectedTopicId, startSession, stopSleepSession]);
+  }, [cueSources, playCueAtIndex, selectedAmbient, selectedInterval, selectedTopicId, selectedVoiceId, startSession, stopSleepSession]);
 
   const handleStop = useCallback(() => {
     void stopSleepSession('user');
     statusRef.current = 'idle';
   }, [stopSleepSession]);
+
+  const handlePreviewVoice = useCallback(async () => {
+    if (isPreviewingVoice) {
+      return;
+    }
+    setIsPreviewingVoice(true);
+    try {
+      if (previewSoundRef.current) {
+        await previewSoundRef.current.stopAsync();
+        await previewSoundRef.current.unloadAsync();
+        previewSoundRef.current = null;
+      }
+
+      const previewAudio = await fetchCueAudio(VOICE_SAMPLE_TEXT, { voiceId: selectedVoiceId });
+      const { sound } = await Audio.Sound.createAsync({ uri: previewAudio.uri }, { shouldPlay: true });
+      previewSoundRef.current = sound;
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) {
+          return;
+        }
+        if (status.didJustFinish) {
+          sound.setOnPlaybackStatusUpdate(null);
+          previewSoundRef.current = null;
+          setIsPreviewingVoice(false);
+        }
+      });
+    } catch (error) {
+      console.error('Voice preview failed', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to preview voice');
+      setIsPreviewingVoice(false);
+    }
+  }, [isPreviewingVoice, selectedVoiceId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -442,31 +504,39 @@ export default function SleepModeScreen() {
 
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
           <ThemedText type="defaultSemiBold">Select topic</ThemedText>
-          <View style={styles.topicRow}>
-            {topicsLoading && topicOptions.length === 0 ? (
-              <ThemedText style={{ color: muted }}>Loading topics…</ThemedText>
-            ) : null}
-            {topicOptions.map((topic) => {
-              const isActive = topic.id === selectedTopicId;
-              return (
-                <TouchableOpacity
-                  key={topic.id}
-                  style={[
-                    styles.topicChip,
-                    {
-                      borderColor,
-                      backgroundColor: isActive ? success : 'transparent',
-                      opacity: status !== 'idle' ? 0.6 : 1,
-                    },
-                  ]}
-                  disabled={status !== 'idle'}
-                  onPress={() => setSelectedTopicId(topic.id)}>
-                  <ThemedText type="defaultSemiBold" style={{ color: isActive ? '#0f1115' : muted }}>
-                    {topic.name}
-                  </ThemedText>
-                </TouchableOpacity>
-              );
-            })}
+          {topicsLoading && topicOptions.length === 0 ? (
+            <ThemedText style={{ color: muted, textAlign: 'center' }}>Loading topics…</ThemedText>
+          ) : null}
+          <View style={styles.optionGrid}>
+            {chunkOptions(topicOptions, 2).map((row, rowIndex) => (
+              <View key={`topic-row-${rowIndex}`} style={styles.optionRow}>
+                {row.map((topic) => {
+                  const isActive = topic.id === selectedTopicId;
+                  const surface = cardSurface(isActive ? activeSurface : inactiveSurface);
+                  return (
+                    <TouchableOpacity
+                      key={topic.id}
+                      style={[
+                        styles.optionButton,
+                        surface,
+                        { opacity: status !== 'idle' ? 0.7 : 1 },
+                      ]}
+                      disabled={status !== 'idle'}
+                      onPress={() => setSelectedTopicId(topic.id)}>
+                      <ThemedText
+                        type="defaultSemiBold"
+                        style={[
+                          styles.optionLabel,
+                          { color: isActive ? activeTextColor : inactiveTextColor },
+                        ]}>
+                        {topic.shortName ?? topic.name}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+                {row.length < 2 ? <View style={styles.optionPlaceholder} /> : null}
+              </View>
+            ))}
           </View>
           {selectedTopicId && cueSources.length === 0 ? (
             <ThemedText style={{ color: muted }}>
@@ -480,30 +550,32 @@ export default function SleepModeScreen() {
           <ThemedText style={[styles.subtitle, { color: muted, fontSize: 12, marginTop: 4 }]}>
             ElevenLabs generates AI ambient sounds that loop softly while cues play. Volume auto-ducks during speech.
           </ThemedText>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.ambientScroll}
             contentContainerStyle={styles.ambientRow}>
             {AMBIENT_OPTIONS.map((option) => {
               const isActive = option.key === selectedAmbient;
+              const surface = cardSurface(isActive ? activeSurface : inactiveSurface);
               return (
                 <TouchableOpacity
                   key={option.key}
                   style={[
                     styles.ambientChip,
-                    {
-                      borderColor,
-                      backgroundColor: isActive ? success : 'transparent',
-                      opacity: status !== 'idle' ? 0.6 : 1,
-                    },
+                    surface,
+                    { opacity: status !== 'idle' ? 0.7 : 1 },
                   ]}
                   disabled={status !== 'idle'}
                   onPress={() => setSelectedAmbient(option.key)}>
-                  <ThemedText style={{ fontSize: 18 }}>{option.emoji}</ThemedText>
+                  <ThemedText style={styles.optionEmoji}>{option.emoji}</ThemedText>
                   <ThemedText
                     type="defaultSemiBold"
-                    style={{ color: isActive ? '#0f1115' : muted, fontSize: 12 }}>
+                    style={[
+                      styles.optionLabel,
+                      styles.ambientLabel,
+                      { color: isActive ? activeTextColor : inactiveTextColor },
+                    ]}>
                     {option.label}
                   </ThemedText>
                 </TouchableOpacity>
@@ -513,32 +585,55 @@ export default function SleepModeScreen() {
         </View>
 
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
-          <ThemedText type="defaultSemiBold">Cue interval</ThemedText>
-          <View style={styles.intervalRow}>
-            {intervals.map((value) => {
-              const isActive = value === selectedInterval;
-              return (
-                <TouchableOpacity
-                  key={value}
-                  style={[
-                    styles.intervalChip,
-                    {
-                      borderColor,
-                      backgroundColor: isActive ? success : 'transparent',
-                      opacity: status === 'playing' ? 0.7 : 1,
-                    },
-                  ]}
-                  disabled={status === 'playing'}
-                  onPress={() => setSelectedInterval(value)}>
-                  <ThemedText
-                    type="defaultSemiBold"
-                    style={{ color: isActive ? '#0f1115' : muted }}>
-                    {value}s
-                  </ThemedText>
-                </TouchableOpacity>
-              );
-            })}
+          <ThemedText type="defaultSemiBold">Voice persona</ThemedText>
+          <ThemedText style={[styles.subtitle, { color: muted }]}>
+            Pick who delivers cues. Preview plays “Hi! Thanks for checking out DreamScape.”
+          </ThemedText>
+          <View style={styles.optionGrid}>
+            {chunkOptions([...VOICE_OPTIONS], 2).map((row, rowIndex) => (
+              <View key={`voice-row-${rowIndex}`} style={styles.optionRow}>
+                {row.map((option) => {
+                  const isActive = option.id === selectedVoiceId;
+                  const surface = cardSurface(isActive ? activeSurface : inactiveSurface);
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[
+                        styles.optionButton,
+                        surface,
+                        { opacity: status !== 'idle' ? 0.7 : 1 },
+                      ]}
+                      disabled={status !== 'idle'}
+                      onPress={() => setSelectedVoiceId(option.id)}>
+                      <ThemedText
+                        type="defaultSemiBold"
+                        style={[
+                          styles.optionLabel,
+                          { color: isActive ? activeTextColor : inactiveTextColor },
+                        ]}>
+                        {option.label}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+                {row.length < 2 ? <View style={styles.optionPlaceholder} /> : null}
+              </View>
+            ))}
           </View>
+          <TouchableOpacity
+            style={[
+              styles.voicePreviewButton,
+              cardSurface(activeSurface),
+              { opacity: isPreviewingVoice ? 0.7 : 1 },
+            ]}
+            onPress={handlePreviewVoice}
+            disabled={isPreviewingVoice}>
+            <ThemedText
+              type="defaultSemiBold"
+              style={{ color: optionTextColor, textAlign: 'center' }}>
+              {isPreviewingVoice ? 'Previewing…' : '▶ Preview voice'}
+            </ThemedText>
+          </TouchableOpacity>
         </View>
 
         {preparedCues.length > 0 ? (
@@ -575,16 +670,17 @@ export default function SleepModeScreen() {
                   3. Add flashcard items (front/back){'\n'}
                   4. Come back here to start learning!
                 </ThemedText>
-                <TouchableOpacity
-                  style={[
-                    styles.primaryButton,
-                    { backgroundColor: success, marginTop: 8 },
-                  ]}
-                  onPress={() => router.push('/add-flashcards')}>
-                  <ThemedText type="defaultSemiBold" style={styles.buttonText}>
-                    Go to Add Flashcards
-                  </ThemedText>
-                </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              cardSurface(activeSurface),
+              { marginTop: 8 },
+            ]}
+            onPress={() => router.push('/add-flashcards')}>
+            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+              Go to Add Flashcards
+            </ThemedText>
+          </TouchableOpacity>
               </>
             )}
           </View>
@@ -594,20 +690,20 @@ export default function SleepModeScreen() {
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              cardSurface(success),
-              { opacity: status === 'idle' ? 1 : 0.6 },
+              cardSurface(activeSurface),
+              { opacity: status === 'idle' ? 1 : 0.6, borderColor, borderWidth: 1 },
             ]}
             onPress={handleStart}
             disabled={status !== 'idle' || isPreparing}>
             <ThemedText type="defaultSemiBold" style={styles.buttonText}>
-              {isPreparing ? 'Preparing…' : 'Start Sleep Session'}
+              {isPreparing ? 'Preparing…' : 'Start'}
             </ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              cardSurface(danger),
-              { opacity: status === 'playing' ? 1 : 0.4 },
+              cardSurface('#3b1921'),
+              { opacity: status === 'playing' ? 1 : 0.4, borderColor: '#5f1e1e', borderWidth: 1 },
             ]}
             onPress={handleStop}
             disabled={status !== 'playing'}>
@@ -636,6 +732,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 4,
     marginTop: 10,
+    overflow: 'hidden',
   },
   subtitle: {
     fontSize: 14,
@@ -643,47 +740,70 @@ const styles = StyleSheet.create({
   pulseText: {
     marginTop: 4,
   },
-  topicRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  topicChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
   ambientScroll: {
     marginTop: 12,
-    marginHorizontal: -18,
-    paddingHorizontal: 18,
+    paddingVertical: 4,
+    overflow: 'hidden',
   },
   ambientRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingRight: 18,
+    gap: 12,
+    paddingHorizontal: 4,
   },
   ambientChip: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    width: 78,
+    aspectRatio: 1,
     borderRadius: 16,
-    borderWidth: 1,
+    padding: 10,
+    marginHorizontal: 2,
     alignItems: 'center',
-    gap: 4,
-    minWidth: 80,
+    justifyContent: 'center',
+    gap: 6,
   },
-  intervalRow: {
-    flexDirection: 'row',
+  optionGrid: {
     gap: 12,
     marginTop: 12,
+    overflow: 'visible',
   },
-  intervalChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+  optionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    overflow: 'visible',
+  },
+  optionButton: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    overflow: 'visible',
+  },
+  optionPlaceholder: {
+    flex: 1,
+    opacity: 0,
+    minHeight: 60,
+  },
+  optionEmoji: {
+    fontSize: 20,
+  },
+  optionLabel: {
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  ambientLabel: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  voicePreviewButton: {
+    marginTop: 16,
+    alignSelf: 'center',
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
   buttonRow: {
     flexDirection: 'row',

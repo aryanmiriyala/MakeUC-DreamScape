@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const topicSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
+  shortName: z.string().min(1).max(32).optional(),
   description: z.string().max(512).optional(),
   tags: z.array(z.string().min(1)).catch([]),
   createdAt: z.string().datetime({ offset: true }),
