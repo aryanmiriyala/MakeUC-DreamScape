@@ -58,6 +58,7 @@ export default function SleepModeScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const statusRef = useRef<SessionStatus>('idle');
   const preparedRef = useRef<PreparedCue[]>([]);
   const currentCueIndexRef = useRef(0);
   const playedCueIdsRef = useRef<Set<string>>(new Set());
@@ -110,13 +111,14 @@ export default function SleepModeScreen() {
 
     activeItems.forEach((item) => {
       const itemCues = Object.values(cues).filter((cue) => cue.itemId === item.id);
+      const snippet = [item.back, item.front].filter(Boolean).join('. ').trim();
 
       if (itemCues.length === 0) {
-        const fallback = item.cueText ?? item.back ?? item.front;
+        const fallback = snippet || item.cueText || item.front;
         if (fallback?.trim()) {
           list.push({
             key: `${item.id}-fallback`,
-            text: fallback,
+            text: fallback.trim(),
             uri: '',
             itemId: item.id,
             topicId: selectedTopicId,
@@ -126,11 +128,13 @@ export default function SleepModeScreen() {
       }
 
       itemCues.forEach((cue) => {
-        const text = cue.cueText ?? item.back ?? item.front;
-        if (text?.trim()) {
+        const composed = cue.cueText
+          ? `${cue.cueText}. ${snippet}`.trim()
+          : snippet || cue.cueText || item.front;
+        if (composed?.trim()) {
           list.push({
             key: cue.id,
-            text,
+            text: composed.trim(),
             uri: '',
             itemId: item.id,
             topicId: selectedTopicId,
@@ -188,6 +192,7 @@ export default function SleepModeScreen() {
       preparedRef.current = [];
       setPreparedCues([]);
       setStatus('idle');
+      statusRef.current = 'idle';
     },
     [cancelSession, cleanupAudio, completeSession]
   );
@@ -206,11 +211,7 @@ export default function SleepModeScreen() {
           await soundRef.current.unloadAsync();
         }
 
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: cue.uri },
-          { shouldPlay: true }
-        );
-
+        const { sound } = await Audio.Sound.createAsync({ uri: cue.uri });
         soundRef.current = sound;
         currentCueIndexRef.current = index;
         setCuesPlayed((count) => count + 1);
@@ -231,6 +232,17 @@ export default function SleepModeScreen() {
             }
           });
         }
+
+        await sound.playAsync();
+        return new Promise<void>((resolve) => {
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (!status.isLoaded) return;
+            if (status.didJustFinish) {
+              sound.setOnPlaybackStatusUpdate(null);
+              resolve();
+            }
+          });
+        });
       } catch (error) {
         console.error('SleepMode cue playback failed', error);
         setErrorMessage(error instanceof Error ? error.message : 'Unable to play cue');
@@ -252,6 +264,7 @@ export default function SleepModeScreen() {
     }
 
     setStatus('preparing');
+    statusRef.current = 'preparing';
     setErrorMessage(null);
     setIsPreparing(true);
     setCuesPlayed(0);
@@ -282,21 +295,25 @@ export default function SleepModeScreen() {
 
       sessionIdRef.current = session.id;
 
+      setStatus('playing');
+      statusRef.current = 'playing';
+
       await playCueAtIndex(0);
 
-      if (prepared.length > 1) {
-        intervalRef.current = setInterval(() => {
-          const cuesToPlay = preparedRef.current;
-          if (cuesToPlay.length === 0) {
-            return;
-          }
-          const nextIndex = (currentCueIndexRef.current + 1) % cuesToPlay.length;
-          currentCueIndexRef.current = nextIndex;
-          void playCueAtIndex(nextIndex);
-        }, selectedInterval * 1000);
-      }
+      const playLoop = async () => {
+        const cuesToPlay = preparedRef.current;
+        if (cuesToPlay.length === 0) {
+          return;
+        }
+        currentCueIndexRef.current = (currentCueIndexRef.current + 1) % cuesToPlay.length;
+        await new Promise((resolve) => setTimeout(resolve, selectedInterval * 1000));
+        await playCueAtIndex(currentCueIndexRef.current);
+        if (statusRef.current === 'playing') {
+          void playLoop();
+        }
+      };
 
-      setStatus('playing');
+      void playLoop();
     } catch (error) {
       console.error('SleepMode handleStart failed', error);
       setErrorMessage(error instanceof Error ? error.message : 'Unable to start sleep session');
@@ -308,6 +325,7 @@ export default function SleepModeScreen() {
 
   const handleStop = useCallback(() => {
     void stopSleepSession('user');
+    statusRef.current = 'idle';
   }, [stopSleepSession]);
 
   useFocusEffect(
@@ -315,6 +333,7 @@ export default function SleepModeScreen() {
       return () => {
         setErrorMessage(null);
         void stopSleepSession('user');
+        statusRef.current = 'idle';
       };
     }, [stopSleepSession])
   );
