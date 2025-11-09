@@ -11,6 +11,7 @@ const tabConfig = [
   { name: 'add-flashcards', title: 'Flashcards', icon: 'square.stack.3d.up.fill' },
   { name: 'sleep-mode', title: 'Sleep', icon: 'bed.double.fill' },
   { name: 'dashboard', title: 'Dashboard', icon: 'chart.bar.xaxis' },
+  { name: 'settings', title: 'Settings', icon: 'gearshape.fill' },
 ] as const;
 
 export default function TabLayout() {
