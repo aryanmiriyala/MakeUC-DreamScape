@@ -61,12 +61,13 @@ export default function SleepModeScreen() {
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
+  const textColor = useThemeColor({}, 'text');
   const buttonBlue = useThemeColor({ light: '#2563eb', dark: '#1d4ed8' }, 'primary');
   const buttonBlueMuted = useThemeColor({ light: '#c7d7ff', dark: '#1e2a4a' }, 'card');
   const activeSurface = buttonBlue;
   const inactiveSurface = buttonBlueMuted;
   const activeTextColor = '#f8fafc';
-  const inactiveTextColor = '#0f1115';
+  const inactiveTextColor = useThemeColor({ light: '#0f1115', dark: '#f8fafc' }, 'text');
   const optionTextColor = '#f8fafc';
   const insets = useSafeAreaInsets();
 

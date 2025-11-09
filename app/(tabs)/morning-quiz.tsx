@@ -33,6 +33,7 @@ export default function MorningQuizScreen() {
   const danger = useThemeColor({}, 'danger');
   const accent = useThemeColor({}, 'accent');
   const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
 
   const sessions = useSleepStore((state) => state.sessions);
   const cueEvents = useSleepStore((state) => state.cueEvents);
@@ -542,7 +543,7 @@ export default function MorningQuizScreen() {
                 onPress={() => onSelect(option)}>
                 <ThemedText
                   type="defaultSemiBold"
-                  style={{ color: isCorrect || isIncorrect ? '#0f1115' : undefined }}>
+                  style={{ color: isCorrect || isIncorrect ? '#0f1115' : textColor }}>
                   {option}
                 </ThemedText>
               </TouchableOpacity>
