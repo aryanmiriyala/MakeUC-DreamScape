@@ -1,4 +1,6 @@
 import { Audio } from 'expo-av';
+import { useFocusEffect } from 'expo-router';
+import { ScrollView } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -110,7 +112,7 @@ export default function SleepModeScreen() {
       const itemCues = Object.values(cues).filter((cue) => cue.itemId === item.id);
 
       if (itemCues.length === 0) {
-        const fallback = item.cueText ?? item.front;
+        const fallback = item.cueText ?? item.back ?? item.front;
         if (fallback?.trim()) {
           list.push({
             key: `${item.id}-fallback`,
@@ -124,7 +126,7 @@ export default function SleepModeScreen() {
       }
 
       itemCues.forEach((cue) => {
-        const text = cue.cueText ?? item.front;
+        const text = cue.cueText ?? item.back ?? item.front;
         if (text?.trim()) {
           list.push({
             key: cue.id,
@@ -230,6 +232,7 @@ export default function SleepModeScreen() {
           });
         }
       } catch (error) {
+        console.error('SleepMode cue playback failed', error);
         setErrorMessage(error instanceof Error ? error.message : 'Unable to play cue');
         void stopSleepSession('error');
       }
@@ -295,6 +298,7 @@ export default function SleepModeScreen() {
 
       setStatus('playing');
     } catch (error) {
+      console.error('SleepMode handleStart failed', error);
       setErrorMessage(error instanceof Error ? error.message : 'Unable to start sleep session');
       await stopSleepSession('error');
     } finally {
@@ -305,6 +309,15 @@ export default function SleepModeScreen() {
   const handleStop = useCallback(() => {
     void stopSleepSession('user');
   }, [stopSleepSession]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setErrorMessage(null);
+        void stopSleepSession('user');
+      };
+    }, [stopSleepSession])
+  );
 
   const pulseStyle = useMemo(
     () => ({
@@ -328,9 +341,15 @@ export default function SleepModeScreen() {
     <ThemedView
       style={[
         styles.screen,
-        { paddingTop: insets.top + 12, paddingBottom: Math.max(24, insets.bottom + 16) },
+        { paddingTop: insets.top + 12 },
       ]}>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(24, insets.bottom + 16) },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <ThemedText type="subtitle">Sleep Mode</ThemedText>
         <ThemedText style={[styles.subtitle, { color: muted }]}>
           Simulate spaced cues with TTS while resting.
@@ -447,7 +466,7 @@ export default function SleepModeScreen() {
             </ThemedText>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </ThemedView>
   );
 }

@@ -126,7 +126,7 @@ export async function fetchCueAudio(text: string, options?: TtsVoiceOptions): Pr
     },
     body: JSON.stringify({
       text,
-      model_id: options?.modelId ?? 'eleven_monolingual_v1',
+      model_id: options?.modelId ?? 'eleven_turbo_v2',
       voice_settings: {
         stability: 0.5,
         similarity_boost: 0.75,

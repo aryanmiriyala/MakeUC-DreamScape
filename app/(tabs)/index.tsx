@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   ScrollView,
@@ -14,15 +15,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
-
-type Topic = {
-  id: string;
-  name: string;
-  cueCount: number;
-  cards: number;
-};
+import { useStoreInitializer } from '@/hooks/use-store-initializer';
+import { useTopicStore } from '@/store/topicStore';
 
 const LOGO_MARK = require('@/assets/images/logo-no-letters.png');
+
+type TopicRow = {
+  id: string;
+  name: string;
+  cards: number;
+  cueCount: number;
+};
 
 const actions = [
   {
@@ -52,19 +55,21 @@ const actions = [
 ] as const;
 
 export default function HomeScreen() {
+  useStoreInitializer(useTopicStore);
+
   const router = useRouter();
   const mutedText = useThemeColor({}, 'textSecondary');
   const backgroundColor = useThemeColor({}, 'background');
   const highlightBackground = useThemeColor({ light: '#f0f4ff', dark: '#1b1f2a' }, 'card');
   const highlightBorder = useThemeColor({ light: '#dbeafe', dark: '#2a3246' }, 'border');
   const highlightCopy = useThemeColor({ light: '#475569', dark: '#cbd5e1' }, 'textSecondary');
-  const [topics] = useState<Topic[]>([
-    { id: '1', name: 'Photosynthesis', cards: 18, cueCount: 54 },
-    { id: '2', name: 'Spanish Basics', cards: 25, cueCount: 40 },
-    { id: '3', name: 'AWS Study', cards: 12, cueCount: 30 },
-  ]);
 
-  const renderTopic: ListRenderItem<Topic> = ({ item }) => (
+  const topicsMap = useTopicStore((state) => state.topics);
+  const items = useTopicStore((state) => state.items);
+  const cues = useTopicStore((state) => state.cues);
+  const loading = useTopicStore((state) => state.loading);
+
+  const renderTopic: ListRenderItem<TopicRow> = ({ item }) => (
     <TopicCard
       title={item.name}
       subtitle={`${item.cards} cards • ${item.cueCount} cues`}
@@ -89,6 +94,36 @@ export default function HomeScreen() {
     }
     return rows;
   }, []);
+
+  const topics = useMemo(() => {
+    const cardCounts: Record<string, number> = {};
+    const cueCounts: Record<string, number> = {};
+
+    Object.values(items).forEach((item) => {
+      cardCounts[item.topicId] = (cardCounts[item.topicId] ?? 0) + 1;
+    });
+
+    Object.values(cues).forEach((cue) => {
+      const topicId = cue.topicId ?? items[cue.itemId]?.topicId;
+      if (!topicId) return;
+      cueCounts[topicId] = (cueCounts[topicId] ?? 0) + 1;
+    });
+
+    return Object.values(topicsMap).map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      cards: cardCounts[topic.id] ?? 0,
+      cueCount: cueCounts[topic.id] ?? 0,
+    }));
+  }, [topicsMap, items, cues]);
+
+  const listEmptyComponent = loading ? (
+    <View style={styles.loadingWrapper}>
+      <ActivityIndicator />
+    </View>
+  ) : (
+    emptyState
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
@@ -146,7 +181,7 @@ export default function HomeScreen() {
           renderItem={renderTopic}
           scrollEnabled={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={emptyState}
+          ListEmptyComponent={listEmptyComponent}
           contentContainerStyle={topics.length === 0 ? styles.emptyWrapper : undefined}
         />
       </ScrollView>
@@ -272,6 +307,9 @@ const styles = StyleSheet.create({
   },
   emptyWrapper: {
     paddingVertical: 24,
+  },
+  loadingWrapper: {
+    paddingVertical: 32,
   },
   emptyText: {
     textAlign: 'center',

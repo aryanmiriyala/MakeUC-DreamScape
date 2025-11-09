@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -15,6 +16,8 @@ import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { summarizeDocumentWithGemini } from '@/lib/gemini';
 import { generateId, putDocument } from '@/lib/storage';
+import { useStoreInitializer } from '@/hooks/use-store-initializer';
+import { useTopicStore } from '@/store/topicStore';
 
 const SUPPORTED_MIME_TYPES = [
   'application/pdf',
@@ -42,6 +45,8 @@ type Cue = {
 };
 
 export default function ImportDocumentScreen() {
+  useStoreInitializer(useTopicStore);
+
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
@@ -57,6 +62,26 @@ export default function ImportDocumentScreen() {
   const [isPicking, setIsPicking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [geminiError, setGeminiError] = useState<string | null>(null);
+  const [isSavingTopic, setIsSavingTopic] = useState(false);
+  const [topicStatus, setTopicStatus] = useState<string | null>(null);
+
+  const addTopic = useTopicStore((state) => state.addTopic);
+  const addItem = useTopicStore((state) => state.addItem);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedFile(null);
+      setCues([]);
+      setPickerError(null);
+      setStatusMessage(null);
+      setGeminiError(null);
+      setTopicStatus(null);
+      setIsPicking(false);
+      setIsUploading(false);
+      setIsGenerating(false);
+      setIsSavingTopic(false);
+    }, [])
+  );
 
   const pickDocument = async () => {
     setPickerError(null);
@@ -191,12 +216,49 @@ export default function ImportDocumentScreen() {
     }
   };
 
-  const hasSelection = Boolean(selectedFile);
-  const hasUploaded = Boolean(selectedFile?.uploaded);
-  const shouldUpload = hasSelection && !hasUploaded;
-  const primaryAction = shouldUpload ? uploadDocument : pickDocument;
-  const primaryLabel = shouldUpload ? '⬆️ Upload Document' : '📄 Choose Document';
-  const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading);
+const hasSelection = Boolean(selectedFile);
+const hasUploaded = Boolean(selectedFile?.uploaded);
+const shouldUpload = hasSelection && !hasUploaded;
+const primaryAction = shouldUpload ? uploadDocument : pickDocument;
+const primaryLabel = shouldUpload ? '⬆️ Upload Document' : '📄 Choose Document';
+const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading);
+  const saveDisabled = cues.length === 0 || isSavingTopic;
+
+  const derivedTopicName = useMemo(() => {
+    if (!selectedFile) return '';
+    return truncateFileName(selectedFile.name, 32);
+  }, [selectedFile]);
+
+  const saveTopicWithCues = async () => {
+    if (!selectedFile?.uploaded || cues.length === 0) return;
+    setIsSavingTopic(true);
+    setTopicStatus(null);
+    try {
+      const topic = await addTopic({
+        name: derivedTopicName || 'Imported Topic',
+        description: `Imported from ${selectedFile.name}`,
+      });
+
+      await Promise.all(
+        cues.map((cue, index) =>
+          addItem(topic.id, {
+            front: cue.cue || `Cue ${index + 1}`,
+            back: cue.snippet || cue.cue || 'Generated cue',
+            cueText: cue.cue || cue.snippet || 'Cue',
+          })
+        )
+      );
+
+      setTopicStatus('Topic saved! Check Home, Flashcards, or Sleep Mode.');
+    } catch (error) {
+      console.error('Failed to save topic', error);
+      setTopicStatus(
+        error instanceof Error ? error.message : 'Unable to save topic. Please try again.'
+      );
+    } finally {
+      setIsSavingTopic(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
@@ -314,14 +376,20 @@ export default function ImportDocumentScreen() {
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              { backgroundColor: primary, opacity: cues.length ? 1 : 0.4 },
+              { backgroundColor: primary, opacity: saveDisabled ? 0.4 : 1 },
             ]}
-            disabled={cues.length === 0}
+            disabled={saveDisabled}
+            onPress={saveTopicWithCues}
           >
             <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
-              💾 Save to Topic
+              {isSavingTopic ? 'Saving…' : '💾 Save to Topic'}
             </ThemedText>
           </TouchableOpacity>
+          {topicStatus && (
+            <ThemedText style={[Typography.caption, styles.successText, { color: primary }]}>
+              {topicStatus}
+            </ThemedText>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

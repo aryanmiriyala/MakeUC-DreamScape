@@ -12,52 +12,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeColor } from '@/hooks/use-theme-color';
-
-type Topic = {
-  id: string;
-  name: string;
-  cards: number;
-  cueCount: number;
-};
-
-type Flashcard = {
-  id: string;
-  front: string;
-  back: string;
-  cue: string;
-};
-
-const topics: Topic[] = [
-  { id: '1', name: 'Photosynthesis', cards: 18, cueCount: 54 },
-  { id: '2', name: 'Spanish Basics', cards: 25, cueCount: 40 },
-  { id: '3', name: 'AWS Study', cards: 12, cueCount: 30 },
-];
-
-const initialFlashcards: Record<string, Flashcard[]> = {
-  '1': [
-    { id: 'p-1', front: 'Chlorophyll role', back: 'Captures sunlight energy', cue: 'sunlight catcher' },
-    { id: 'p-2', front: 'Water splitting', back: 'Creates oxygen + electrons', cue: 'water to oxygen' },
-  ],
-  '2': [
-    { id: 's-1', front: 'Hola', back: 'Hello', cue: 'hola greeting' },
-    { id: 's-2', front: 'Gracias', back: 'Thank you', cue: 'gracias note' },
-  ],
-  '3': [
-    { id: 'a-1', front: 'S3 durability', back: 'Designed for eleven 9s', cue: 'eleven nines' },
-  ],
-};
+import { useStoreInitializer } from '@/hooks/use-store-initializer';
+import { useTopicStore } from '@/store/topicStore';
 
 export default function AddFlashcardsScreen() {
+  useStoreInitializer(useTopicStore);
+
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
   const primary = useThemeColor({}, 'primary');
   const insets = useSafeAreaInsets();
 
-  const [topicFlashcards, setTopicFlashcards] = useState<Record<string, Flashcard[]>>(initialFlashcards);
+  const topics = useTopicStore((state) => state.topics);
+  const items = useTopicStore((state) => state.items);
+  const cues = useTopicStore((state) => state.cues);
+  const addItem = useTopicStore((state) => state.addItem);
+  const loading = useTopicStore((state) => state.loading);
+
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const openTopic = (topicId: string) => {
     setActiveTopicId(topicId);
@@ -71,9 +48,33 @@ export default function AddFlashcardsScreen() {
     setBack('');
   };
 
-  const topicName = activeTopicId ? topics.find((topic) => topic.id === activeTopicId)?.name : '';
-
-  const activeFlashcards = activeTopicId ? topicFlashcards[activeTopicId] ?? [] : [];
+  const topicArray = useMemo(() => Object.values(topics), [topics]);
+  const itemCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.values(items).forEach((item) => {
+      counts[item.topicId] = (counts[item.topicId] ?? 0) + 1;
+    });
+    return counts;
+  }, [items]);
+  const cueCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.values(cues).forEach((cue) => {
+      const topicId = cue.topicId ?? items[cue.itemId]?.topicId;
+      if (!topicId) return;
+      counts[topicId] = (counts[topicId] ?? 0) + 1;
+    });
+    return counts;
+  }, [cues, items]);
+  const topicName = activeTopicId ? topics[activeTopicId]?.name ?? '' : '';
+  const activeFlashcards = useMemo(
+    () =>
+      activeTopicId
+        ? Object.values(items)
+            .filter((item) => item.topicId === activeTopicId)
+            .sort((a, b) => (a.updatedAt > b.updatedAt ? -1 : 1))
+        : [],
+    [activeTopicId, items]
+  );
   const canSave = front.trim().length > 0 && back.trim().length > 0 && Boolean(activeTopicId);
 
   const listEmpty = useMemo(
@@ -85,20 +86,23 @@ export default function AddFlashcardsScreen() {
     [muted]
   );
 
-  const onAddFlashcard = () => {
+  const onAddFlashcard = async () => {
     if (!canSave || !activeTopicId) return;
-    const newCard: Flashcard = {
-      id: `${activeTopicId}-${Date.now()}`,
-      front: front.trim(),
-      back: back.trim(),
-      cue: front.trim().slice(0, 20).toLowerCase(),
-    };
-    setTopicFlashcards((prev) => ({
-      ...prev,
-      [activeTopicId]: [newCard, ...(prev[activeTopicId] ?? [])],
-    }));
-    setFront('');
-    setBack('');
+    setIsSaving(true);
+    setFormError(null);
+    try {
+      await addItem(activeTopicId, {
+        front: front.trim(),
+        back: back.trim(),
+        cueText: front.trim().slice(0, 48),
+      });
+      setFront('');
+      setBack('');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to save flashcard.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -112,17 +116,28 @@ export default function AddFlashcardsScreen() {
           </ThemedText>
         </View>
         <View style={styles.topicList}>
-          {topics.map((topic) => (
-            <TopicCard
+          {topicArray.length === 0 && !loading && (
+            <ThemedText style={{ color: muted }}>
+              No topics yet. Create one from the Home screen to start adding flashcards.
+            </ThemedText>
+          )}
+          {topicArray.map((topic) => {
+            const cardCount = itemCounts[topic.id] ?? 0;
+            const cueCount = cueCounts[topic.id] ?? 0;
+            return (
+              <TopicCard
               key={topic.id}
               title={topic.name}
-              subtitle={`${topic.cards} cards • ${topic.cueCount} cues`}
+              subtitle={`${cardCount} cards • ${cueCount} cues`}
               onPress={() => openTopic(topic.id)}
               cardColor={cardColor}
               borderColor={borderColor}
               muted={muted}
             />
-          ))}
+          )})}
+          {loading && (
+            <ThemedText style={{ color: muted }}>Loading topics…</ThemedText>
+          )}
         </View>
       </ScrollView>
 
@@ -156,15 +171,18 @@ export default function AddFlashcardsScreen() {
                 value={back}
                 onChangeText={setBack}
               />
+              {formError && (
+                <ThemedText style={[styles.errorText, { color: primary }]}>{formError}</ThemedText>
+              )}
               <TouchableOpacity
                 onPress={onAddFlashcard}
-                disabled={!canSave}
+                disabled={!canSave || isSaving}
                 style={[
                   styles.primaryButton,
-                  { backgroundColor: primary, opacity: canSave ? 1 : 0.4 },
+                  { backgroundColor: primary, opacity: canSave && !isSaving ? 1 : 0.4 },
                 ]}>
                 <ThemedText type="defaultSemiBold" style={styles.primaryText}>
-                  Add Flashcard
+                  {isSaving ? 'Saving…' : 'Add Flashcard'}
                 </ThemedText>
               </TouchableOpacity>
 
@@ -183,9 +201,9 @@ export default function AddFlashcardsScreen() {
                     </ThemedText>
                     <View style={styles.cueRow}>
                       <ThemedText style={[styles.cueLabel, { color: muted }]}>
-                        cue: “{item.cue}”
+                        cue: “{item.cueText ?? '—'}”
                       </ThemedText>
-                      <TouchableOpacity onPress={() => alert(`Previewing ${item.cue}`)}>
+                      <TouchableOpacity onPress={() => alert(`Previewing ${item.cueText ?? ''}`)}>
                         <ThemedText type="link">Preview Cue</ThemedText>
                       </TouchableOpacity>
                     </View>
@@ -296,6 +314,9 @@ const styles = StyleSheet.create({
   },
   cueLabel: {
     fontSize: 14,
+  },
+  errorText: {
+    marginTop: 8,
   },
   emptyText: {
     textAlign: 'center',
