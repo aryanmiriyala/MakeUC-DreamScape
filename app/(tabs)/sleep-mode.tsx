@@ -7,8 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PageHeading } from '@/components/page-heading';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AppButton } from '@/components/ui/app-button';
-import { cardSurface, CARD_SHADOW } from '@/constants/shadow';
+import { cardSurface } from '@/constants/shadow';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
   fetchAmbientPreset,
@@ -218,6 +217,7 @@ export default function SleepModeScreen() {
       setPreparedCues([]);
       setStatus('idle');
       statusRef.current = 'idle';
+      setIsPreparing(false);
     },
     [cancelSession, cleanupAudio, completeSession]
   );
@@ -325,7 +325,7 @@ export default function SleepModeScreen() {
       // Start ambient background music if selected
       if (selectedAmbient !== 'none') {
         try {
-          const ambientAudio = await fetchAmbientPreset(selectedAmbient, 300); // 5 minutes
+          const ambientAudio = await fetchAmbientPreset(selectedAmbient, 30); // ElevenLabs max duration
           const { sound: ambientSound } = await Audio.Sound.createAsync(
             { uri: ambientAudio.uri },
             { 
@@ -374,7 +374,7 @@ export default function SleepModeScreen() {
     } finally {
       setIsPreparing(false);
     }
-  }, [cueSources, playCueAtIndex, selectedInterval, selectedTopicId, startSession, stopSleepSession]);
+  }, [cueSources, playCueAtIndex, selectedAmbient, selectedInterval, selectedTopicId, startSession, stopSleepSession]);
 
   const handleStop = useCallback(() => {
     void stopSleepSession('user');
@@ -428,8 +428,7 @@ export default function SleepModeScreen() {
           spacing={16}
         />
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-        <View style={[styles.card, cardSurface(cardColor)]}>
+        <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
           <ThemedText>Status: {statusLabel}</ThemedText>
           <ThemedText style={{ color: muted }}>Cues played: {cuesPlayed}</ThemedText>
           <Animated.Text style={[styles.pulseText, { color: muted }, pulseStyle]}>
@@ -437,8 +436,7 @@ export default function SleepModeScreen() {
           </Animated.Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-        <View style={[styles.card, cardSurface(cardColor)]}>
+        <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
           <ThemedText type="defaultSemiBold">Select topic</ThemedText>
           <View style={styles.topicRow}>
             {topicsLoading && topicOptions.length === 0 ? (
@@ -473,7 +471,7 @@ export default function SleepModeScreen() {
           ) : null}
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
           <ThemedText type="defaultSemiBold">✨ Background ambience (Pro)</ThemedText>
           <ThemedText style={[styles.subtitle, { color: muted, fontSize: 12, marginTop: 4 }]}>
             ElevenLabs generates AI ambient sounds that loop softly while cues play. Volume auto-ducks during speech.
@@ -510,8 +508,7 @@ export default function SleepModeScreen() {
           </ScrollView>
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-        <View style={[styles.card, cardSurface(cardColor)]}>
+        <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
           <ThemedText type="defaultSemiBold">Cue interval</ThemedText>
           <View style={styles.intervalRow}>
             {intervals.map((value) => {
@@ -541,8 +538,7 @@ export default function SleepModeScreen() {
         </View>
 
         {preparedCues.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <View style={[styles.card, cardSurface(cardColor)]}>
+          <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
             <ThemedText type="defaultSemiBold">Queued cues</ThemedText>
             <View style={styles.cueList}>
               {preparedCues.map((cue) => (
@@ -555,8 +551,12 @@ export default function SleepModeScreen() {
         ) : null}
 
         {errorMessage ? (
-          <View style={[styles.card, { borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
-          <View style={[styles.card, cardSurface('#fca5a533'), { borderWidth: 1, borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
+          <View
+            style={[
+              styles.card,
+              cardSurface('#fca5a533'),
+              { borderColor: '#f87171', backgroundColor: '#fca5a533' },
+            ]}>
             <ThemedText type="defaultSemiBold" style={{ color: '#7f1d1d' }}>
               {errorMessage}
             </ThemedText>
@@ -565,7 +565,11 @@ export default function SleepModeScreen() {
 
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: success, opacity: status === 'idle' ? 1 : 0.6 }]}
+            style={[
+              styles.primaryButton,
+              cardSurface(success),
+              { opacity: status === 'idle' ? 1 : 0.6 },
+            ]}
             onPress={handleStart}
             disabled={status !== 'idle' || isPreparing}>
             <ThemedText type="defaultSemiBold" style={styles.buttonText}>
@@ -573,7 +577,11 @@ export default function SleepModeScreen() {
             </ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: danger, opacity: status === 'playing' ? 1 : 0.4 }]}
+            style={[
+              styles.primaryButton,
+              cardSurface(danger),
+              { opacity: status === 'playing' ? 1 : 0.4 },
+            ]}
             onPress={handleStop}
             disabled={status !== 'playing'}>
             <ThemedText type="defaultSemiBold" style={styles.buttonText}>
@@ -589,20 +597,17 @@ export default function SleepModeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingHorizontal: 24,
   },
   content: {
     gap: 16,
+    paddingHorizontal: 24,
   },
   card: {
     borderWidth: 1,
     borderRadius: 16,
     padding: 18,
     gap: 8,
-    borderRadius: 16,
-    padding: 18,
-    gap: 8,
-    marginHorizontal: 6,
+    marginHorizontal: 4,
     marginTop: 10,
   },
   pulseText: {
@@ -655,10 +660,12 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 16,
     marginBottom: 24,
+    marginHorizontal: 4,
   },
   primaryButton: {
     flex: 1,
     paddingVertical: 16,
+    paddingHorizontal: 18,
     borderRadius: 16,
     alignItems: 'center',
   },
