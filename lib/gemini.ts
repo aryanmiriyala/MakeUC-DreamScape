@@ -13,6 +13,12 @@ type SummarizeParams = {
   originalName?: string;
 };
 
+type TopicHeaderParams = {
+  topicName: string;
+  description?: string;
+  maxLength?: number;
+};
+
 export type GeminiCue = {
   id: string;
   cue: string;
@@ -109,6 +115,75 @@ export async function summarizeDocumentWithGemini({
       snippet: typeof cue?.snippet === 'string' ? cue.snippet.trim() : '',
     }))
     .filter((cue: GeminiCue) => cue.cue.length > 0 && cue.snippet.length > 0);
+}
+
+export async function generateTopicHeader({
+  topicName,
+  description,
+  maxLength = 20,
+}: TopicHeaderParams): Promise<string> {
+  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? process.env.EXPO_PUBLIC_GEMINI_KEY;
+
+  if (!apiKey) {
+    throw new Error('Missing Gemini API key. Set EXPO_PUBLIC_GEMINI_API_KEY in your env.');
+  }
+
+  const constraints = [
+    `Topic name: "${topicName.trim()}"`,
+    description ? `Description: ${description.trim()}` : '',
+    `Return a condensed label of at most ${maxLength} characters.`,
+    'Use title case if possible, avoid emojis, punctuation, or numbering.',
+    'Respond with the label text only (no quotes or explanations).',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      generation_config: {
+        temperature: 0.2,
+        top_p: 0.9,
+        max_output_tokens: 32,
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: constraints,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.text();
+    throw new Error(`Gemini topic header failed (${response.status}): ${errorPayload}`);
+  }
+
+  const payload = await response.json();
+  const textResponse: string | undefined = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!textResponse) {
+    throw new Error('Gemini returned an empty topic header response.');
+  }
+
+  const normalized = textResponse
+    .split('\n')[0]
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .trim();
+
+  if (!normalized) {
+    throw new Error('Gemini topic header response was blank.');
+  }
+
+  return normalized.slice(0, maxLength).trim();
 }
 
 function sanitizeGeminiJson(raw: string): string {
@@ -250,4 +325,3 @@ Return ONLY valid JSON in this exact format:
     )
     .slice(0, numQuestions);
 }
-

@@ -25,33 +25,36 @@ export function PageHeading({
 
   return (
     <View style={[styles.container, { marginBottom: spacing }, containerStyle]}>
-      <View style={styles.row}>
-        <View style={styles.leadingGroup}>
-          {leadingSlot}
-          <ThemedText type="title">{title}</ThemedText>
-        </View>
-        {actionSlot}
-      </View>
+      {leadingSlot ? <View style={styles.leadingWrapper}>{leadingSlot}</View> : null}
+      <ThemedText type="title" style={styles.title}>
+        {title}
+      </ThemedText>
       {subtitle ? (
-        <ThemedText style={[Typography.caption, { color: subtitleColor }]}>{subtitle}</ThemedText>
+        <ThemedText style={[Typography.caption, styles.subtitle, { color: subtitleColor }]}>
+          {subtitle}
+        </ThemedText>
       ) : null}
+      {actionSlot ? <View style={styles.actionWrapper}>{actionSlot}</View> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 6,
-  },
-  row: {
-    flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  leadingGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 10,
-    flexShrink: 1,
+  leadingWrapper: {
+    marginBottom: 4,
+  },
+  title: {
+    textAlign: 'center',
+  },
+  subtitle: {
+    textAlign: 'center',
+  },
+  actionWrapper: {
+    marginTop: 8,
   },
 });

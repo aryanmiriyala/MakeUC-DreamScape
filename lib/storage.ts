@@ -323,12 +323,19 @@ export async function resetStorage(): Promise<void> {
   await AsyncStorage.setItem(VERSION_KEY, STORAGE_VERSION.toString());
 }
 
-export function createTopicPayload(name: string, description?: string, tags: string[] = []): Topic {
+export function createTopicPayload(
+  name: string,
+  description?: string,
+  tags: string[] = [],
+  shortName?: string
+): Topic {
   const timestamp = nowIso();
+  const fallbackShort = name.trim().slice(0, 20);
 
   return topicSchema.parse({
     id: generateId('topic'),
     name,
+    shortName: (shortName ?? fallbackShort).trim() || fallbackShort,
     description,
     tags,
     createdAt: timestamp,

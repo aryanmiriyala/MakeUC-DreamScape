@@ -18,7 +18,7 @@ import { cardSurface } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { summarizeDocumentWithGemini } from '@/lib/gemini';
+import { generateTopicHeader, summarizeDocumentWithGemini } from '@/lib/gemini';
 import { generateId, putDocument } from '@/lib/storage';
 import { useTopicStore } from '@/store/topicStore';
 
@@ -223,9 +223,24 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
     setIsSavingTopic(true);
     setTopicStatus(null);
     try {
+      const topicName = derivedTopicName || 'Imported Topic';
+      const topicDescription = `Imported from ${selectedFile.name}`;
+      let shortHeader = topicName.slice(0, 20);
+
+      try {
+        shortHeader = await generateTopicHeader({
+          topicName,
+          description: topicDescription,
+          maxLength: 20,
+        });
+      } catch (error) {
+        console.warn('generateTopicHeader failed, falling back to truncated name', error);
+      }
+
       const topic = await addTopic({
-        name: derivedTopicName || 'Imported Topic',
-        description: `Imported from ${selectedFile.name}`,
+        name: topicName,
+        description: topicDescription,
+        shortName: shortHeader,
       });
 
       // Create items and their associated cues
