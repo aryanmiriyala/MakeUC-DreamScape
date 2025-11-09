@@ -6,10 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PageHeading } from '@/components/page-heading';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { cardSurface } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { useTopicStore } from '@/store/topicStore';
 
 const LOGO_MARK = require('@/assets/images/logo-no-letters-removebg-preview.png');
@@ -58,6 +57,10 @@ export default function HomeScreen() {
   const highlightBackground = useThemeColor({ light: '#f0f4ff', dark: '#1b1f2a' }, 'card');
   const highlightBorder = useThemeColor({ light: '#dbeafe', dark: '#2a3246' }, 'border');
   const highlightCopy = useThemeColor({ light: '#475569', dark: '#cbd5e1' }, 'textSecondary');
+  
+  // Hero card theme colors
+  const heroCardBg = useThemeColor({ light: '#f8fafc', dark: '#0f172a' }, 'card');
+  const heroBodyText = useThemeColor({ light: '#475569', dark: '#dbeafe' }, 'text');
 
   const totalTopics = Object.keys(topics).length;
   const totalCards =
@@ -82,26 +85,29 @@ export default function HomeScreen() {
           spacing={24}
         />
 
-        <View style={styles.heroCard}>
+        <View style={[styles.heroCard, { backgroundColor: heroCardBg }]}>
           <View style={styles.heroHeader}>
-            <ThemedText type="subtitle">Tonight’s ritual</ThemedText>
+            <ThemedText type="subtitle">Tonight's ritual</ThemedText>
             <View style={styles.heroPill}>
               <IconSymbol name="sparkles" size={16} color="#0f1115" />
               
             </View>
           </View>
-          <ThemedText style={styles.heroBody}>
+          <ThemedText style={[styles.heroBody, { color: heroBodyText }]}>
             Import cues, let Sleep Mode whisper while you rest, then crush the morning quiz.
           </ThemedText>
           <View style={styles.heroActions}>
             <TouchableOpacity style={styles.heroPrimary} onPress={() => router.push('/sleep-mode')}>
-              <IconSymbol name="moon.zzz.fill" size={18} color="#0f1115" />
+              <IconSymbol name="moon.zzz.fill" size={20} color="#0f1115" />
               <ThemedText type="defaultSemiBold" style={styles.heroPrimaryText}>
                 Start Sleep Mode
               </ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/import-document')}>
-              <ThemedText type="link">Import document ↗</ThemedText>
+            <TouchableOpacity style={styles.heroSecondary} onPress={() => router.push('/import-document')}>
+              <IconSymbol name="doc.text.fill" size={18} color="#a5b4fc" />
+              <ThemedText type="defaultSemiBold" style={styles.heroSecondaryText}>
+                Import
+              </ThemedText>
             </TouchableOpacity>
           </View>
         </View>
@@ -180,11 +186,16 @@ type InsightCardProps = {
 };
 
 const InsightCard = ({ label, value, caption }: InsightCardProps) => {
+  const cardColor = useThemeColor({ light: '#f8fafc', dark: '#111827' }, 'card');
+  const borderColor = useThemeColor({ light: '#e2e8f0', dark: 'rgba(255,255,255,0.08)' }, 'border');
+  const labelColor = useThemeColor({ light: '#64748b', dark: '#c7d2fe' }, 'textSecondary');
+  const captionColor = useThemeColor({ light: '#94a3b8', dark: '#94a3b8' }, 'textSecondary');
+
   return (
-    <View style={styles.insightCard}>
-      <ThemedText style={styles.insightLabel}>{label}</ThemedText>
+    <View style={[styles.insightCard, { backgroundColor: cardColor, borderColor }]}>
+      <ThemedText style={[styles.insightLabel, { color: labelColor }]}>{label}</ThemedText>
       <ThemedText type="title">{value}</ThemedText>
-      <ThemedText style={styles.insightCaption}>{caption}</ThemedText>
+      <ThemedText style={[styles.insightCaption, { color: captionColor }]}>{caption}</ThemedText>
     </View>
   );
 };
@@ -206,7 +217,6 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 26,
     padding: 22,
-    backgroundColor: '#0f172a',
     gap: 12,
   },
   heroHeader: {
@@ -229,25 +239,43 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   heroBody: {
-    color: '#dbeafe',
     lineHeight: 22,
   },
   heroActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
   },
   heroPrimary: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     backgroundColor: '#a5b4fc',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 16,
   },
   heroPrimaryText: {
     color: '#0f1115',
+    fontSize: 15,
+  },
+  heroSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(165, 180, 252, 0.15)',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(165, 180, 252, 0.3)',
+  },
+  heroSecondaryText: {
+    color: '#a5b4fc',
+    fontSize: 15,
   },
   statsRow: {
     flexDirection: 'row',
@@ -257,17 +285,13 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 18,
     padding: 16,
-    backgroundColor: '#111827',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
     gap: 2,
   },
   insightLabel: {
-    color: '#c7d2fe',
     fontSize: 13,
   },
   insightCaption: {
-    color: '#94a3b8',
     fontSize: 13,
   },
   actionsWrapper: {
