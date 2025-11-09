@@ -61,10 +61,10 @@ export default function SleepModeScreen() {
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
-  const success = useThemeColor({}, 'success');
-  const danger = useThemeColor({}, 'danger');
-  const activeSurface = useThemeColor({ light: '#41485f', dark: '#23283a' }, 'card');
-  const inactiveSurface = useThemeColor({ light: '#f7f8fb', dark: '#1a1d27' }, 'card');
+  const buttonBlue = useThemeColor({ light: '#2563eb', dark: '#1d4ed8' }, 'primary');
+  const buttonBlueMuted = useThemeColor({ light: '#c7d7ff', dark: '#1e2a4a' }, 'card');
+  const activeSurface = buttonBlue;
+  const inactiveSurface = buttonBlueMuted;
   const activeTextColor = '#f8fafc';
   const inactiveTextColor = '#0f1115';
   const optionTextColor = '#f8fafc';
@@ -512,14 +512,14 @@ export default function SleepModeScreen() {
               <View key={`topic-row-${rowIndex}`} style={styles.optionRow}>
                 {row.map((topic) => {
                   const isActive = topic.id === selectedTopicId;
-                  const surface = cardSurface(isActive ? activeSurface : inactiveSurface);
+                  const backgroundColor = isActive ? activeSurface : inactiveSurface;
                   return (
                     <TouchableOpacity
                       key={topic.id}
                       style={[
                         styles.optionButton,
-                        surface,
-                        { opacity: status !== 'idle' ? 0.7 : 1 },
+                        styles.flatButton,
+                        { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
                       ]}
                       disabled={status !== 'idle'}
                       onPress={() => setSelectedTopicId(topic.id)}>
@@ -557,14 +557,14 @@ export default function SleepModeScreen() {
             contentContainerStyle={styles.ambientRow}>
             {AMBIENT_OPTIONS.map((option) => {
               const isActive = option.key === selectedAmbient;
-              const surface = cardSurface(isActive ? activeSurface : inactiveSurface);
+              const backgroundColor = isActive ? activeSurface : inactiveSurface;
               return (
                 <TouchableOpacity
                   key={option.key}
                   style={[
                     styles.ambientChip,
-                    surface,
-                    { opacity: status !== 'idle' ? 0.7 : 1 },
+                    styles.flatButton,
+                    { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
                   ]}
                   disabled={status !== 'idle'}
                   onPress={() => setSelectedAmbient(option.key)}>
@@ -594,14 +594,14 @@ export default function SleepModeScreen() {
               <View key={`voice-row-${rowIndex}`} style={styles.optionRow}>
                 {row.map((option) => {
                   const isActive = option.id === selectedVoiceId;
-                  const surface = cardSurface(isActive ? activeSurface : inactiveSurface);
+                  const backgroundColor = isActive ? activeSurface : inactiveSurface;
                   return (
                     <TouchableOpacity
                       key={option.id}
                       style={[
                         styles.optionButton,
-                        surface,
-                        { opacity: status !== 'idle' ? 0.7 : 1 },
+                        styles.flatButton,
+                        { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
                       ]}
                       disabled={status !== 'idle'}
                       onPress={() => setSelectedVoiceId(option.id)}>
@@ -779,6 +779,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     overflow: 'visible',
+  },
+  flatButton: {
+    borderWidth: 0,
+    borderColor: 'transparent',
+    shadowColor: 'transparent',
+    elevation: 0,
   },
   optionPlaceholder: {
     flex: 1,
