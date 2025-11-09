@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +41,7 @@ type PreparedCue = {
 };
 
 export default function SleepModeScreen() {
+  const router = useRouter();
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
   const muted = useThemeColor({}, 'textSecondary');
@@ -190,11 +191,14 @@ export default function SleepModeScreen() {
       sessionIdRef.current = null;
 
       const cueIdsPlayed = Array.from(playedCueIdsRef.current);
+      const hasPlayedCues = cueIdsPlayed.length > 0;
       playedCueIdsRef.current.clear();
 
       if (sessionId) {
         try {
-          if (mode === 'completed') {
+          // If user stopped manually BUT played at least one cue, mark as completed
+          // This allows Morning Quiz to generate questions from partial sessions
+          if (mode === 'completed' || (mode === 'user' && hasPlayedCues)) {
             await completeSession(sessionId, {
               cueIdsPlayed,
               interruptions: 0,
@@ -557,9 +561,32 @@ export default function SleepModeScreen() {
               cardSurface('#fca5a533'),
               { borderColor: '#f87171', backgroundColor: '#fca5a533' },
             ]}>
-            <ThemedText type="defaultSemiBold" style={{ color: '#7f1d1d' }}>
+            <ThemedText type="defaultSemiBold" style={{ color: '#7f1d1d', marginBottom: 12 }}>
               {errorMessage}
             </ThemedText>
+            {cueSources.length === 0 && (
+              <>
+                <ThemedText style={{ color: '#7f1d1d', fontSize: 14, marginBottom: 12 }}>
+                  💡 To use Sleep Mode, you need to create flashcards first:
+                </ThemedText>
+                <ThemedText style={{ color: '#7f1d1d', fontSize: 13, marginBottom: 8 }}>
+                  1. Go to "Add Flashcards" tab{'\n'}
+                  2. Create a topic or select one{'\n'}
+                  3. Add flashcard items (front/back){'\n'}
+                  4. Come back here to start learning!
+                </ThemedText>
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    { backgroundColor: success, marginTop: 8 },
+                  ]}
+                  onPress={() => router.push('/add-flashcards')}>
+                  <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+                    Go to Add Flashcards
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         ) : null}
 
