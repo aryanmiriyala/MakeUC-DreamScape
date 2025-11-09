@@ -36,6 +36,10 @@ const VOICE_OPTIONS = [
 ] as const;
 
 const VOICE_SAMPLE_TEXT = 'Hi! Thanks for checking out DreamScape.';
+const VOICE_PREVIEW_VOLUME = 0.9;
+const AMBIENT_LOOP_VOLUME = 0.35;
+const AMBIENT_DUCKED_VOLUME = 0.12;
+const AMBIENT_PREVIEW_DURATION = 15; // seconds
 
 function chunkOptions<T>(options: T[], size = 2): T[][] {
   const chunks: T[][] = [];
@@ -94,16 +98,56 @@ export default function SleepModeScreen() {
   const [preparedCues, setPreparedCues] = useState<PreparedCue[]>([]);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
+  const [isPreviewingAmbient, setIsPreviewingAmbient] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const ambientSoundRef = useRef<Audio.Sound | null>(null);
   const previewSoundRef = useRef<Audio.Sound | null>(null);
+  const ambientPreviewRef = useRef<Audio.Sound | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const statusRef = useRef<SessionStatus>('idle');
   const preparedRef = useRef<PreparedCue[]>([]);
   const currentCueIndexRef = useRef(0);
   const playedCueIdsRef = useRef<Set<string>>(new Set());
+  const previewVoiceIdRef = useRef<string | null>(null);
+  const previewAmbientKeyRef = useRef<AmbientPreset | 'none' | null>(null);
+
+  const stopSound = useCallback(async (ref: React.MutableRefObject<Audio.Sound | null>) => {
+    if (!ref.current) return;
+    try {
+      await ref.current.stopAsync();
+    } catch {
+      // ignore stop errors
+    }
+    try {
+      await ref.current.unloadAsync();
+    } catch {
+      // ignore unload errors
+    }
+    ref.current = null;
+  }, []);
+
+  const ensureAudioMode = useCallback(async () => {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: true,
+    });
+  }, []);
+
+  const stopVoicePreview = useCallback(async () => {
+    previewVoiceIdRef.current = null;
+    setIsPreviewingVoice(false);
+    await stopSound(previewSoundRef);
+  }, [stopSound]);
+
+  const stopAmbientPreview = useCallback(async () => {
+    previewAmbientKeyRef.current = null;
+    setIsPreviewingAmbient(false);
+    await stopSound(ambientPreviewRef);
+  }, [stopSound]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -198,20 +242,11 @@ export default function SleepModeScreen() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-    if (ambientSoundRef.current) {
-      await ambientSoundRef.current.unloadAsync();
-      ambientSoundRef.current = null;
-    }
-    if (previewSoundRef.current) {
-      await previewSoundRef.current.unloadAsync();
-      previewSoundRef.current = null;
-    }
-    setIsPreviewingVoice(false);
-  }, []);
+    await stopSound(soundRef);
+    await stopSound(ambientSoundRef);
+    await stopVoicePreview();
+    await stopAmbientPreview();
+  }, [stopAmbientPreview, stopSound, stopVoicePreview]);
 
   const stopSleepSession = useCallback(
     async (mode: 'user' | 'error' | 'completed' = 'user') => {
@@ -256,6 +291,69 @@ export default function SleepModeScreen() {
     [cancelSession, cleanupAudio, completeSession]
   );
 
+  const startVoicePreview = useCallback(
+    async (voiceId: string) => {
+      try {
+        await ensureAudioMode();
+        previewVoiceIdRef.current = voiceId;
+        setIsPreviewingVoice(true);
+
+        const previewAudio = await fetchCueAudio(VOICE_SAMPLE_TEXT, { voiceId });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: previewAudio.uri },
+          { shouldPlay: true, volume: VOICE_PREVIEW_VOLUME }
+        );
+        previewSoundRef.current = sound;
+
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) {
+            return;
+          }
+          if (status.didJustFinish) {
+            sound.setOnPlaybackStatusUpdate(null);
+            void stopVoicePreview();
+          }
+        });
+      } catch (error) {
+        console.error('Voice preview failed', error);
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to preview voice');
+        await stopVoicePreview();
+      }
+    },
+    [ensureAudioMode, stopVoicePreview]
+  );
+
+  const startAmbientPreview = useCallback(
+    async (preset: AmbientPreset) => {
+      try {
+        await ensureAudioMode();
+        previewAmbientKeyRef.current = preset;
+        setIsPreviewingAmbient(true);
+
+        const ambientAudio = await fetchAmbientPreset(preset, AMBIENT_PREVIEW_DURATION);
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: ambientAudio.uri },
+          { shouldPlay: true, isLooping: false, volume: AMBIENT_LOOP_VOLUME }
+        );
+        ambientPreviewRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) {
+            return;
+          }
+          if (status.didJustFinish) {
+            sound.setOnPlaybackStatusUpdate(null);
+            void stopAmbientPreview();
+          }
+        });
+      } catch (error) {
+        console.error('Ambient preview failed', error);
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to preview ambience');
+        await stopAmbientPreview();
+      }
+    },
+    [ensureAudioMode, stopAmbientPreview]
+  );
+
   const playCueAtIndex = useCallback(
     async (index: number) => {
       const cuesToPlay = preparedRef.current;
@@ -272,7 +370,7 @@ export default function SleepModeScreen() {
 
         // Duck ambient audio during cue playback (lower volume)
         if (ambientSoundRef.current) {
-          await ambientSoundRef.current.setVolumeAsync(0.05);
+          await ambientSoundRef.current.setVolumeAsync(AMBIENT_DUCKED_VOLUME);
         }
 
         const { sound } = await Audio.Sound.createAsync({ uri: cue.uri });
@@ -305,7 +403,7 @@ export default function SleepModeScreen() {
               sound.setOnPlaybackStatusUpdate(null);
               // Restore ambient volume after cue finishes
               if (ambientSoundRef.current) {
-                void ambientSoundRef.current.setVolumeAsync(0.15);
+                void ambientSoundRef.current.setVolumeAsync(AMBIENT_LOOP_VOLUME);
               }
               resolve();
             }
@@ -339,12 +437,9 @@ export default function SleepModeScreen() {
     playedCueIdsRef.current.clear();
 
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-      });
+      await stopVoicePreview();
+      await stopAmbientPreview();
+      await ensureAudioMode();
 
       const prepared: PreparedCue[] = [];
 
@@ -359,13 +454,13 @@ export default function SleepModeScreen() {
       // Start ambient background music if selected
       if (selectedAmbient !== 'none') {
         try {
-          const ambientAudio = await fetchAmbientPreset(selectedAmbient, 30); // ElevenLabs max duration
+          const ambientAudio = await fetchAmbientPreset(selectedAmbient, 30); // API max duration
           const { sound: ambientSound } = await Audio.Sound.createAsync(
             { uri: ambientAudio.uri },
             { 
               shouldPlay: true, 
               isLooping: true,
-              volume: 0.15, // Low volume for background
+              volume: AMBIENT_LOOP_VOLUME,
             }
           );
           ambientSoundRef.current = ambientSound;
@@ -416,37 +511,86 @@ export default function SleepModeScreen() {
   }, [stopSleepSession]);
 
   const handlePreviewVoice = useCallback(async () => {
-    if (isPreviewingVoice) {
+    if (status !== 'idle') {
+      setErrorMessage('Stop the current session before previewing a voice.');
       return;
     }
-    setIsPreviewingVoice(true);
-    try {
-      if (previewSoundRef.current) {
-        await previewSoundRef.current.stopAsync();
-        await previewSoundRef.current.unloadAsync();
-        previewSoundRef.current = null;
+
+    if (isPreviewingVoice && previewVoiceIdRef.current === selectedVoiceId) {
+      await stopVoicePreview();
+      return;
+    }
+
+    if (isPreviewingVoice) {
+      await stopVoicePreview();
+    }
+
+    await startVoicePreview(selectedVoiceId);
+  }, [isPreviewingVoice, selectedVoiceId, startVoicePreview, status, stopVoicePreview]);
+
+  const handleSelectVoice = useCallback(
+    async (voiceId: string) => {
+      if (status !== 'idle') {
+        return;
+      }
+      if (voiceId === selectedVoiceId) {
+        if (isPreviewingVoice) {
+          await stopVoicePreview();
+        }
+        return;
       }
 
-      const previewAudio = await fetchCueAudio(VOICE_SAMPLE_TEXT, { voiceId: selectedVoiceId });
-      const { sound } = await Audio.Sound.createAsync({ uri: previewAudio.uri }, { shouldPlay: true });
-      previewSoundRef.current = sound;
+      setSelectedVoiceId(voiceId);
+      if (isPreviewingVoice) {
+        await stopVoicePreview();
+        await startVoicePreview(voiceId);
+      }
+    },
+    [isPreviewingVoice, selectedVoiceId, startVoicePreview, status, stopVoicePreview]
+  );
 
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) {
-          return;
-        }
-        if (status.didJustFinish) {
-          sound.setOnPlaybackStatusUpdate(null);
-          previewSoundRef.current = null;
-          setIsPreviewingVoice(false);
-        }
-      });
-    } catch (error) {
-      console.error('Voice preview failed', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to preview voice');
-      setIsPreviewingVoice(false);
+  const handlePreviewAmbient = useCallback(async () => {
+    if (selectedAmbient === 'none') {
+      setErrorMessage('Select an ambience preset to preview.');
+      return;
     }
-  }, [isPreviewingVoice, selectedVoiceId]);
+
+    if (status !== 'idle') {
+      setErrorMessage('Stop the current session before previewing ambience.');
+      return;
+    }
+
+    if (isPreviewingAmbient && previewAmbientKeyRef.current === selectedAmbient) {
+      await stopAmbientPreview();
+      return;
+    }
+
+    if (isPreviewingAmbient) {
+      await stopAmbientPreview();
+    }
+
+    await startAmbientPreview(selectedAmbient);
+  }, [
+    isPreviewingAmbient,
+    selectedAmbient,
+    startAmbientPreview,
+    status,
+    stopAmbientPreview,
+  ]);
+
+  const handleSelectAmbient = useCallback(
+    async (preset: AmbientPreset | 'none') => {
+      if (status !== 'idle') {
+        return;
+      }
+
+      setSelectedAmbient(preset);
+      if (isPreviewingAmbient) {
+        await stopAmbientPreview();
+      }
+    },
+    [isPreviewingAmbient, status, stopAmbientPreview]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -475,6 +619,18 @@ export default function SleepModeScreen() {
         return 'Ready';
     }
   }, [status]);
+
+  const previewLocked = status !== 'idle';
+  const voicePreviewDisabled = previewLocked && !isPreviewingVoice;
+  const ambientPreviewDisabled =
+    (selectedAmbient === 'none' || previewLocked) && !isPreviewingAmbient;
+  const voicePreviewLabel = isPreviewingVoice ? '■  Stop voice preview' : '▶  Preview voice';
+  const ambientPreviewLabel =
+    selectedAmbient === 'none'
+      ? 'Select ambience to preview'
+      : isPreviewingAmbient
+        ? '■  Stop ambience preview'
+        : '▶  Preview ambience';
 
   return (
     <ThemedView
@@ -508,36 +664,34 @@ export default function SleepModeScreen() {
           {topicsLoading && topicOptions.length === 0 ? (
             <ThemedText style={{ color: muted, textAlign: 'center' }}>Loading topics…</ThemedText>
           ) : null}
-          <View style={styles.optionGrid}>
-            {chunkOptions(topicOptions, 2).map((row, rowIndex) => (
-              <View key={`topic-row-${rowIndex}`} style={styles.optionRow}>
-                {row.map((topic) => {
-                  const isActive = topic.id === selectedTopicId;
-                  const backgroundColor = isActive ? activeSurface : inactiveSurface;
-                  return (
-                    <TouchableOpacity
-                      key={topic.id}
-                      style={[
-                        styles.optionButton,
-                        styles.flatButton,
-                        { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
-                      ]}
-                      disabled={status !== 'idle'}
-                      onPress={() => setSelectedTopicId(topic.id)}>
-                      <ThemedText
-                        type="defaultSemiBold"
-                        style={[
-                          styles.optionLabel,
-                          { color: isActive ? activeTextColor : inactiveTextColor },
-                        ]}>
-                        {topic.shortName ?? topic.name}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  );
-                })}
-                {row.length < 2 ? <View style={styles.optionPlaceholder} /> : null}
-              </View>
-            ))}
+          <View style={styles.topicColumn}>
+            {topicOptions.map((topic) => {
+              const isActive = topic.id === selectedTopicId;
+              const backgroundColor = isActive ? activeSurface : inactiveSurface;
+              const label = topic.name?.trim() || topic.shortName || 'Untitled topic';
+              return (
+                <TouchableOpacity
+                  key={topic.id}
+                  style={[
+                    styles.optionButton,
+                    styles.topicButton,
+                    styles.flatButton,
+                    { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
+                  ]}
+                  disabled={status !== 'idle'}
+                  onPress={() => setSelectedTopicId(topic.id)}>
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={[
+                      styles.optionLabel,
+                      styles.topicLabel,
+                      { color: isActive ? activeTextColor : inactiveTextColor },
+                    ]}>
+                    {label}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
           </View>
           {selectedTopicId && cueSources.length === 0 ? (
             <ThemedText style={{ color: muted }}>
@@ -568,7 +722,7 @@ export default function SleepModeScreen() {
                     { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
                   ]}
                   disabled={status !== 'idle'}
-                  onPress={() => setSelectedAmbient(option.key)}>
+                  onPress={() => handleSelectAmbient(option.key)}>
                   <ThemedText style={styles.optionEmoji}>{option.emoji}</ThemedText>
                   <ThemedText
                     type="defaultSemiBold"
@@ -583,6 +737,21 @@ export default function SleepModeScreen() {
               );
             })}
           </ScrollView>
+          <TouchableOpacity
+            style={[
+              styles.previewButton,
+              styles.ambientPreviewButton,
+              cardSurface(activeSurface),
+              ambientPreviewDisabled ? styles.disabledButton : null,
+            ]}
+            onPress={handlePreviewAmbient}
+            disabled={ambientPreviewDisabled}>
+            <ThemedText
+              type="defaultSemiBold"
+              style={[styles.previewButtonText, { color: optionTextColor }]}>
+              {ambientPreviewLabel}
+            </ThemedText>
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
@@ -605,7 +774,7 @@ export default function SleepModeScreen() {
                         { backgroundColor, opacity: status !== 'idle' ? 0.7 : 1 },
                       ]}
                       disabled={status !== 'idle'}
-                      onPress={() => setSelectedVoiceId(option.id)}>
+                      onPress={() => handleSelectVoice(option.id)}>
                       <ThemedText
                         type="defaultSemiBold"
                         style={[
@@ -623,16 +792,18 @@ export default function SleepModeScreen() {
           </View>
           <TouchableOpacity
             style={[
+              styles.previewButton,
               styles.voicePreviewButton,
               cardSurface(activeSurface),
-              { opacity: isPreviewingVoice ? 0.7 : 1 },
+              isPreviewingVoice ? styles.previewActive : null,
+              voicePreviewDisabled ? styles.disabledButton : null,
             ]}
             onPress={handlePreviewVoice}
-            disabled={isPreviewingVoice}>
+            disabled={voicePreviewDisabled}>
             <ThemedText
               type="defaultSemiBold"
-              style={{ color: optionTextColor, textAlign: 'center' }}>
-              {isPreviewingVoice ? 'Previewing…' : '▶ Preview voice'}
+              style={[styles.previewButtonText, { color: optionTextColor }]}>
+              {voicePreviewLabel}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -764,6 +935,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     overflow: 'visible',
   },
+  topicColumn: {
+    gap: 12,
+    marginTop: 12,
+  },
   optionRow: {
     flexDirection: 'row',
     gap: 10,
@@ -778,6 +953,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 56,
     overflow: 'visible',
+  },
+  topicButton: {
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  topicLabel: {
+    textAlign: 'left',
   },
   flatButton: {
     borderWidth: 0,
@@ -802,13 +984,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  voicePreviewButton: {
+  previewButton: {
     marginTop: 16,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  ambientPreviewButton: {},
+  voicePreviewButton: {},
+  previewButtonText: {
+    textAlign: 'center',
+  },
+  previewActive: {
+    opacity: 0.75,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   buttonRow: {
     flexDirection: 'row',
