@@ -1,22 +1,31 @@
-import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import type { AudioPlayer } from 'expo-audio';
+import { Audio } from 'expo-av';
 import { useFocusEffect } from 'expo-router';
-import { ScrollView } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AppButton } from '@/components/ui/app-button';
-import { cardShadow } from '@/constants/shadow';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { fetchCueAudio } from '@/lib/elevenlabs';
+import {
+  fetchAmbientPreset,
+  fetchCueAudio,
+  type AmbientPreset
+} from '@/lib/elevenlabs';
 import { useSleepStore } from '@/store/sleepStore';
 import { useTopicStore } from '@/store/topicStore';
 import { useStoreInitializer } from '../../hooks/use-store-initializer';
 
 const intervals = [3, 5, 10] as const;
+const AMBIENT_OPTIONS: Array<{ key: AmbientPreset | 'none'; label: string; emoji: string }> = [
+  { key: 'none', label: 'No Music', emoji: '🔇' },
+  { key: 'lofi', label: 'Lo-Fi', emoji: '🎵' },
+  { key: 'rain', label: 'Rain', emoji: '🌧️' },
+  { key: 'ocean', label: 'Ocean', emoji: '🌊' },
+  { key: 'forest', label: 'Forest', emoji: '🌲' },
+  { key: 'piano', label: 'Piano', emoji: '🎹' },
+  { key: 'white_noise', label: 'White Noise', emoji: '⚪' },
+];
 
 type SessionStatus = 'idle' | 'preparing' | 'playing';
 
@@ -54,15 +63,14 @@ export default function SleepModeScreen() {
   const [selectedInterval, setSelectedInterval] = useState<(typeof intervals)[number]>(5);
   const [cuesPlayed, setCuesPlayed] = useState(0);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedAmbient, setSelectedAmbient] = useState<AmbientPreset | 'none'>('lofi');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [preparedCues, setPreparedCues] = useState<PreparedCue[]>([]);
   const [isPreparing, setIsPreparing] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const playerRef = useRef<AudioPlayer | null>(null);
-  const playbackSubscriptionRef = useRef<{ remove: () => void } | null>(null);
-  const playbackResolveRef = useRef<(() => void) | null>(null);
-  const playbackRejectRef = useRef<((error: Error) => void) | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const ambientSoundRef = useRef<Audio.Sound | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const statusRef = useRef<SessionStatus>('idle');
   const preparedRef = useRef<PreparedCue[]>([]);
@@ -86,25 +94,13 @@ export default function SleepModeScreen() {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      if (playbackSubscriptionRef.current) {
-        playbackSubscriptionRef.current.remove();
-        playbackSubscriptionRef.current = null;
+      if (soundRef.current) {
+        void soundRef.current.unloadAsync();
+        soundRef.current = null;
       }
-      if (playbackResolveRef.current) {
-        playbackResolveRef.current();
-        playbackResolveRef.current = null;
-        playbackRejectRef.current = null;
-      } else {
-        playbackRejectRef.current = null;
-      }
-      if (playerRef.current) {
-        try {
-          playerRef.current.pause();
-        } catch (_error) {
-          // player might already be released
-        }
-        playerRef.current.remove();
-        playerRef.current = null;
+      if (ambientSoundRef.current) {
+        void ambientSoundRef.current.unloadAsync();
+        ambientSoundRef.current = null;
       }
     };
   }, []);
@@ -169,46 +165,19 @@ export default function SleepModeScreen() {
     return list;
   }, [activeItems, cues, selectedTopicId]);
 
-  const settlePlaybackPromise = useCallback(
-    (type: 'resolve' | 'reject', error?: Error) => {
-      if (type === 'resolve' && playbackResolveRef.current) {
-        playbackResolveRef.current();
-      }
-      if (type === 'reject' && playbackRejectRef.current) {
-        playbackRejectRef.current(error ?? new Error('Playback stopped'));
-      }
-      playbackResolveRef.current = null;
-      playbackRejectRef.current = null;
-    },
-    []
-  );
-
   const cleanupAudio = useCallback(async () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (playbackSubscriptionRef.current) {
-      playbackSubscriptionRef.current.remove();
-      playbackSubscriptionRef.current = null;
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
     }
-    settlePlaybackPromise('resolve');
-    if (playerRef.current) {
-      try {
-        playerRef.current.pause();
-      } catch (_error) {
-        // no-op
-      }
-      playerRef.current.remove();
-      playerRef.current = null;
+    if (ambientSoundRef.current) {
+      await ambientSoundRef.current.unloadAsync();
+      ambientSoundRef.current = null;
     }
-  }, [settlePlaybackPromise]);
-
-  const ensurePlayer = useCallback(() => {
-    if (!playerRef.current) {
-      playerRef.current = createAudioPlayer(null, { updateInterval: 250, keepAudioSessionActive: true });
-    }
-    return playerRef.current;
   }, []);
 
   const stopSleepSession = useCallback(
@@ -259,34 +228,18 @@ export default function SleepModeScreen() {
       }
 
       try {
-        const player = ensurePlayer();
-        if (playbackSubscriptionRef.current) {
-          playbackSubscriptionRef.current.remove();
-          playbackSubscriptionRef.current = null;
+        if (soundRef.current) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
         }
 
-        const playbackCompleted = new Promise<void>((resolve, reject) => {
-          playbackResolveRef.current = resolve;
-          playbackRejectRef.current = reject;
-          playbackSubscriptionRef.current = player.addListener('playbackStatusUpdate', (status) => {
-            if (!status.isLoaded) {
-              if (status.playbackState === 'failed') {
-                playbackSubscriptionRef.current?.remove();
-                playbackSubscriptionRef.current = null;
-                settlePlaybackPromise('reject', new Error('Cue playback failed.'));
-              }
-              return;
-            }
+        // Duck ambient audio during cue playback (lower volume)
+        if (ambientSoundRef.current) {
+          await ambientSoundRef.current.setVolumeAsync(0.05);
+        }
 
-            if (status.didJustFinish) {
-              playbackSubscriptionRef.current?.remove();
-              playbackSubscriptionRef.current = null;
-              settlePlaybackPromise('resolve');
-            }
-          });
-        });
-
-        player.replace({ uri: cue.uri });
+        const { sound } = await Audio.Sound.createAsync({ uri: cue.uri });
+        soundRef.current = sound;
         currentCueIndexRef.current = index;
         setCuesPlayed((count) => count + 1);
         playedCueIdsRef.current.add(cue.cueId ?? cue.itemId);
@@ -307,18 +260,27 @@ export default function SleepModeScreen() {
           });
         }
 
-        player.play();
-        await playbackCompleted;
+        await sound.playAsync();
+        return new Promise<void>((resolve) => {
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (!status.isLoaded) return;
+            if (status.didJustFinish) {
+              sound.setOnPlaybackStatusUpdate(null);
+              // Restore ambient volume after cue finishes
+              if (ambientSoundRef.current) {
+                void ambientSoundRef.current.setVolumeAsync(0.15);
+              }
+              resolve();
+            }
+          });
+        });
       } catch (error) {
-        settlePlaybackPromise('reject', error instanceof Error ? error : new Error('Unable to play cue'));
         console.error('SleepMode cue playback failed', error);
-        if (statusRef.current !== 'idle') {
-          setErrorMessage(error instanceof Error ? error.message : 'Unable to play cue');
-          void stopSleepSession('error');
-        }
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to play cue');
+        void stopSleepSession('error');
       }
     },
-    [ensurePlayer, logCueEvent, settlePlaybackPromise, stopSleepSession]
+    [logCueEvent, stopSleepSession]
   );
 
   const handleStart = useCallback(async () => {
@@ -340,12 +302,11 @@ export default function SleepModeScreen() {
     playedCueIdsRef.current.clear();
 
     try {
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-        shouldPlayInBackground: true,
-        interruptionMode: 'duckOthers',
-        interruptionModeAndroid: 'duckOthers',
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
       });
 
       const prepared: PreparedCue[] = [];
@@ -357,6 +318,25 @@ export default function SleepModeScreen() {
 
       preparedRef.current = prepared;
       setPreparedCues(prepared);
+
+      // Start ambient background music if selected
+      if (selectedAmbient !== 'none') {
+        try {
+          const ambientAudio = await fetchAmbientPreset(selectedAmbient, 300); // 5 minutes
+          const { sound: ambientSound } = await Audio.Sound.createAsync(
+            { uri: ambientAudio.uri },
+            { 
+              shouldPlay: true, 
+              isLooping: true,
+              volume: 0.15, // Low volume for background
+            }
+          );
+          ambientSoundRef.current = ambientSound;
+        } catch (ambientError) {
+          console.warn('Failed to load ambient audio, continuing without it:', ambientError);
+          // Don't fail the whole session if ambient fails
+        }
+      }
 
       const session = await startSession({
         topicId: selectedTopicId,
@@ -433,7 +413,6 @@ export default function SleepModeScreen() {
         { paddingTop: insets.top + 12 },
       ]}>
       <ScrollView
-        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(24, insets.bottom + 16) },
@@ -445,7 +424,7 @@ export default function SleepModeScreen() {
           Simulate spaced cues with TTS while resting.
         </ThemedText>
 
-        <View style={[styles.card, { backgroundColor: cardColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText>Status: {statusLabel}</ThemedText>
           <ThemedText style={{ color: muted }}>Cues played: {cuesPlayed}</ThemedText>
           <Animated.Text style={[styles.pulseText, { color: muted }, pulseStyle]}>
@@ -453,7 +432,7 @@ export default function SleepModeScreen() {
           </Animated.Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText type="defaultSemiBold">Select topic</ThemedText>
           <View style={styles.topicRow}>
             {topicsLoading && topicOptions.length === 0 ? (
@@ -489,6 +468,43 @@ export default function SleepModeScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+          <ThemedText type="defaultSemiBold">✨ Background ambience (Pro)</ThemedText>
+          <ThemedText style={[styles.subtitle, { color: muted, fontSize: 12, marginTop: 4 }]}>
+            ElevenLabs generates AI ambient sounds that loop softly while cues play. Volume auto-ducks during speech.
+          </ThemedText>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.ambientScroll}
+            contentContainerStyle={styles.ambientRow}>
+            {AMBIENT_OPTIONS.map((option) => {
+              const isActive = option.key === selectedAmbient;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[
+                    styles.ambientChip,
+                    {
+                      borderColor,
+                      backgroundColor: isActive ? success : 'transparent',
+                      opacity: status !== 'idle' ? 0.6 : 1,
+                    },
+                  ]}
+                  disabled={status !== 'idle'}
+                  onPress={() => setSelectedAmbient(option.key)}>
+                  <ThemedText style={{ fontSize: 18 }}>{option.emoji}</ThemedText>
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={{ color: isActive ? '#0f1115' : muted, fontSize: 12 }}>
+                    {option.label}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText type="defaultSemiBold">Cue interval</ThemedText>
           <View style={styles.intervalRow}>
             {intervals.map((value) => {
@@ -518,7 +534,7 @@ export default function SleepModeScreen() {
         </View>
 
         {preparedCues.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: cardColor }]}>
+          <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
             <ThemedText type="defaultSemiBold">Queued cues</ThemedText>
             <View style={styles.cueList}>
               {preparedCues.map((cue) => (
@@ -531,7 +547,7 @@ export default function SleepModeScreen() {
         ) : null}
 
         {errorMessage ? (
-          <View style={[styles.card, { borderWidth: 1, borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
+          <View style={[styles.card, { borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
             <ThemedText type="defaultSemiBold" style={{ color: '#7f1d1d' }}>
               {errorMessage}
             </ThemedText>
@@ -539,22 +555,22 @@ export default function SleepModeScreen() {
         ) : null}
 
         <View style={styles.buttonRow}>
-          <AppButton
-            label={isPreparing ? 'Preparing…' : 'Start Session'}
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: success, opacity: status === 'idle' ? 1 : 0.6 }]}
             onPress={handleStart}
-            loading={isPreparing}
-            disabled={status !== 'idle'}
-            fullWidth={false}
-            style={styles.actionButton}
-          />
-          <AppButton
-            label="Stop"
+            disabled={status !== 'idle' || isPreparing}>
+            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+              {isPreparing ? 'Preparing…' : 'Start Sleep Session'}
+            </ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: danger, opacity: status === 'playing' ? 1 : 0.4 }]}
             onPress={handleStop}
-            disabled={status !== 'playing'}
-            variant="danger"
-            fullWidth={false}
-            style={styles.actionButton}
-          />
+            disabled={status !== 'playing'}>
+            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
+              Stop
+            </ThemedText>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </ThemedView>
@@ -566,24 +582,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  scroll: {
-    overflow: 'visible',
-  },
   content: {
     gap: 16,
-    overflow: 'visible',
   },
   subtitle: {
     fontSize: 14,
   },
   card: {
-    ...cardShadow,
-    borderWidth: 0,
+    borderWidth: 1,
     borderRadius: 16,
     padding: 18,
     gap: 8,
-    marginHorizontal: 4,
-    marginTop: 8,
   },
   pulseText: {
     marginTop: 4,
@@ -599,6 +608,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
+  },
+  ambientScroll: {
+    marginTop: 12,
+    marginHorizontal: -18,
+    paddingHorizontal: 18,
+  },
+  ambientRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 18,
+  },
+  ambientChip: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 80,
   },
   intervalRow: {
     flexDirection: 'row',
@@ -617,8 +645,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 24,
   },
-  actionButton: {
+  primaryButton: {
     flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#ffffff',
   },
   cueList: {
     gap: 6,
