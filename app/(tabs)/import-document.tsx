@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,12 +13,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { summarizeDocumentWithGemini } from '@/lib/gemini';
+import { generateId, putDocument } from '@/lib/storage';
+
+const SUPPORTED_MIME_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+] as const;
+
+type SupportedMimeType = (typeof SUPPORTED_MIME_TYPES)[number];
 
 type FileMeta = {
   name: string;
   uri: string;
-  mimeType: 'application/pdf' | 'text/plain';
+  mimeType: SupportedMimeType;
   size?: number | null;
+  uploaded?: boolean;
 };
 
 type Cue = {
@@ -25,12 +40,6 @@ type Cue = {
   cue: string;
   snippet: string;
 };
-
-const mockCues: Cue[] = [
-  { id: '1', cue: 'deep sleep', snippet: 'Deep sleep drives hormone regulation and memory.' },
-  { id: '2', cue: 'cue spacing', snippet: 'Deliver new cues every 5–10 seconds.' },
-  { id: '3', cue: 'soft audio', snippet: 'Keep TTS at whisper volume to avoid waking users.' },
-];
 
 export default function ImportDocumentScreen() {
   const cardColor = useThemeColor({}, 'card');
@@ -44,12 +53,18 @@ export default function ImportDocumentScreen() {
   const [cues, setCues] = useState<Cue[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isPicking, setIsPicking] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [geminiError, setGeminiError] = useState<string | null>(null);
 
   const pickDocument = async () => {
     setPickerError(null);
+    setStatusMessage(null);
+    setIsPicking(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'text/plain'],
+        type: SUPPORTED_MIME_TYPES,
         copyToCacheDirectory: true,
         multiple: false,
       });
@@ -75,11 +90,10 @@ export default function ImportDocumentScreen() {
       }
 
       const inferredMime =
-        (asset.mimeType as FileMeta['mimeType'] | undefined) ??
-        (asset.name?.toLowerCase().endsWith('.txt') ? 'text/plain' : 'application/pdf');
+        (asset.mimeType as SupportedMimeType | undefined) ?? inferMimeFromName(asset.name);
 
-      if (inferredMime !== 'application/pdf' && inferredMime !== 'text/plain') {
-        setPickerError('Please select a PDF or TXT file.');
+      if (!inferredMime || !SUPPORTED_MIME_TYPES.includes(inferredMime)) {
+        setPickerError('Please select a PDF, TXT, Word, or PowerPoint file.');
         return;
       }
 
@@ -88,22 +102,101 @@ export default function ImportDocumentScreen() {
         uri: asset.uri,
         mimeType: inferredMime,
         size: asset.size,
+        uploaded: false,
       });
       setCues([]);
+      setGeminiError(null);
     } catch (error) {
       console.error('Document picker error', error);
       setPickerError('Unable to open file. Please try again.');
+    } finally {
+      setIsPicking(false);
     }
   };
 
-  const generateCues = () => {
+  const uploadDocument = async () => {
     if (!selectedFile) return;
-    setIsGenerating(true);
-    setTimeout(() => {
-      setCues(mockCues);
-      setIsGenerating(false);
-    }, 1100);
+
+    setPickerError(null);
+    setStatusMessage(null);
+    setIsUploading(true);
+
+    try {
+      const id = generateId('doc');
+      const extension = resolveExtension(selectedFile);
+      const storageRoot = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+      let destination = selectedFile.uri;
+      let storedInAppSandbox = false;
+
+      if (storageRoot) {
+        const targetDir = `${storageRoot}documents/`;
+        await ensureDirectory(targetDir);
+        destination = `${targetDir}${id}${extension}`;
+        await FileSystem.copyAsync({ from: selectedFile.uri, to: destination });
+        storedInAppSandbox = true;
+      }
+
+      await putDocument({
+        id,
+        originalName: selectedFile.name,
+        mimeType: selectedFile.mimeType,
+        size: selectedFile.size ?? undefined,
+        localUri: destination,
+        uploadedAt: new Date().toISOString(),
+      });
+
+      setSelectedFile((prev) =>
+        prev
+          ? {
+              ...prev,
+              uri: destination,
+              uploaded: true,
+            }
+          : prev
+      );
+      setStatusMessage('Document uploaded successfully.');
+    } catch (error) {
+      console.error('Document upload failed', error);
+      setPickerError('Unable to upload the document. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
   };
+
+  const generateCues = async () => {
+    if (!selectedFile?.uploaded) return;
+    setGeminiError(null);
+    setIsGenerating(true);
+
+    try {
+      const cuesFromGemini = await summarizeDocumentWithGemini({
+        uri: selectedFile.uri,
+        mimeType: selectedFile.mimeType,
+        originalName: selectedFile.name,
+      });
+
+      if (!cuesFromGemini.length) {
+        setGeminiError('Gemini returned an empty response. Try a smaller section of the document.');
+        setCues([]);
+      } else {
+        setCues(cuesFromGemini);
+      }
+    } catch (error) {
+      console.error('Gemini summarization failed', error);
+      setGeminiError(
+        error instanceof Error ? error.message : 'Unable to summarize document with Gemini.'
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const hasSelection = Boolean(selectedFile);
+  const hasUploaded = Boolean(selectedFile?.uploaded);
+  const shouldUpload = hasSelection && !hasUploaded;
+  const primaryAction = shouldUpload ? uploadDocument : pickDocument;
+  const primaryLabel = shouldUpload ? '⬆️ Upload Document' : '📄 Choose Document';
+  const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
@@ -111,7 +204,7 @@ export default function ImportDocumentScreen() {
         <View style={styles.header}>
           <ThemedText type="subtitle">Import Document</ThemedText>
           <ThemedText style={[Typography.caption, { color: muted }]}>
-            Upload PDFs or TXT files for Gemini to summarize.
+            Upload PDFs or TXT files (Word & PowerPoint also supported) for Gemini to summarize.
           </ThemedText>
         </View>
 
@@ -119,11 +212,23 @@ export default function ImportDocumentScreen() {
           <ThemedText type="defaultSemiBold">1. Upload file</ThemedText>
           {selectedFile ? (
             <View style={styles.fileRow}>
-              <ThemedText style={Typography.body}>{selectedFile.name}</ThemedText>
-              <ThemedText style={[Typography.caption, { color: muted }]}>
-                {selectedFile.mimeType === 'application/pdf' ? 'PDF' : 'TXT'}
-                {selectedFile.size ? ` • ${(selectedFile.size / 1024).toFixed(0)} KB` : ''}
-              </ThemedText>
+              <View>
+                <ThemedText style={Typography.body}>{truncateFileName(selectedFile.name)}</ThemedText>
+                <ThemedText style={[Typography.caption, { color: muted }]}>
+                  {fileBadge(selectedFile.mimeType)}
+                </ThemedText>
+              </View>
+                <TouchableOpacity
+                  accessibilityLabel="Remove document"
+                  onPress={() => {
+                    setSelectedFile(null);
+                    setCues([]);
+                    setStatusMessage(null);
+                    setGeminiError(null);
+                  }}
+                >
+                <ThemedText style={[Typography.bodySemi, styles.removeIcon]}>✖️</ThemedText>
+              </TouchableOpacity>
             </View>
           ) : (
             <ThemedText style={[Typography.caption, { color: muted }]}>
@@ -131,12 +236,30 @@ export default function ImportDocumentScreen() {
             </ThemedText>
           )}
 
-          <TouchableOpacity style={[styles.outlineButton, { borderColor }]} onPress={pickDocument}>
-            <ThemedText type="defaultSemiBold">📄 Choose Document</ThemedText>
+          <TouchableOpacity
+            style={[
+              styles.outlineButton,
+              {
+                borderColor,
+                backgroundColor: accent,
+                opacity: primaryBusy ? 0.5 : 1,
+              },
+            ]}
+            onPress={primaryAction}
+            disabled={primaryBusy}
+          >
+            <ThemedText type="defaultSemiBold" style={styles.primaryText}>
+              {primaryBusy ? '⏳ Working…' : primaryLabel}
+            </ThemedText>
           </TouchableOpacity>
           {pickerError && (
             <ThemedText style={[Typography.caption, styles.errorText, { color: accent }]}>
               {pickerError}
+            </ThemedText>
+          )}
+          {statusMessage && (
+            <ThemedText style={[Typography.caption, styles.successText, { color: primary }]}>
+              {statusMessage}
             </ThemedText>
           )}
         </View>
@@ -146,10 +269,11 @@ export default function ImportDocumentScreen() {
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              { backgroundColor: accent, opacity: selectedFile ? 1 : 0.4 },
+              { backgroundColor: accent, opacity: hasUploaded ? 1 : 0.4 },
             ]}
-            disabled={!selectedFile || isGenerating}
-            onPress={generateCues}>
+            disabled={!hasUploaded || isGenerating}
+            onPress={generateCues}
+          >
             <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
               ✨ Generate Cues (Gemini)
             </ThemedText>
@@ -162,6 +286,11 @@ export default function ImportDocumentScreen() {
                 Summarizing with Gemini…
               </ThemedText>
             </View>
+          )}
+          {geminiError && (
+            <ThemedText style={[Typography.caption, styles.errorText, { color: accent }]}>
+              {geminiError}
+            </ThemedText>
           )}
         </View>
 
@@ -187,7 +316,8 @@ export default function ImportDocumentScreen() {
               styles.primaryButton,
               { backgroundColor: primary, opacity: cues.length ? 1 : 0.4 },
             ]}
-            disabled={cues.length === 0}>
+            disabled={cues.length === 0}
+          >
             <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
               💾 Save to Topic
             </ThemedText>
@@ -246,4 +376,75 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 8,
   },
+  successText: {
+    marginTop: 8,
+  },
+  removeIcon: {
+    fontSize: 18,
+  },
 });
+
+function truncateFileName(name: string, maxLength = 15): string {
+  if (name.length <= maxLength) {
+    return name;
+  }
+  return `${name.slice(0, maxLength)}…`;
+}
+
+function fileBadge(mime: SupportedMimeType): string {
+  if (mime === 'application/pdf') return 'PDF';
+  if (mime === 'text/plain') return 'TXT';
+  if (
+    mime === 'application/msword' ||
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return 'Word';
+  }
+  return 'Slides';
+}
+
+function inferMimeFromName(name?: string): SupportedMimeType | undefined {
+  if (!name) return undefined;
+  const lowered = name.toLowerCase();
+  if (lowered.endsWith('.pdf')) return 'application/pdf';
+  if (lowered.endsWith('.txt')) return 'text/plain';
+  if (lowered.endsWith('.doc')) return 'application/msword';
+  if (lowered.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (lowered.endsWith('.ppt')) return 'application/vnd.ms-powerpoint';
+  if (lowered.endsWith('.pptx')) {
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+  return undefined;
+}
+
+async function ensureDirectory(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (info.exists && info.isDirectory) {
+    return;
+  }
+  await FileSystem.makeDirectoryAsync(path, { intermediates: true });
+}
+
+function resolveExtension(file: FileMeta): string {
+  const mimeToExtension: Record<SupportedMimeType, string> = {
+    'application/pdf': '.pdf',
+    'text/plain': '.txt',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  };
+
+  if (mimeToExtension[file.mimeType]) {
+    return mimeToExtension[file.mimeType];
+  }
+
+  const dot = file.name.lastIndexOf('.');
+  if (dot !== -1) {
+    return file.name.slice(dot);
+  }
+
+  return '.bin';
+}
