@@ -5,6 +5,7 @@ import {
   AppSettings,
   Cue,
   CueEvent,
+  DocumentAsset,
   Item,
   QuizResult,
   SleepSession,
@@ -13,6 +14,7 @@ import {
   cueEventSchema,
   cueSchema,
   defaultSettings,
+  documentAssetSchema,
   itemSchema,
   quizResultSchema,
   sleepSessionSchema,
@@ -31,12 +33,14 @@ const STORAGE_KEYS = {
   cueEvents: `${NAMESPACE}:cueEvents`,
   quizResults: `${NAMESPACE}:quizResults`,
   settings: `${NAMESPACE}:settings`,
+  documents: `${NAMESPACE}:documents`,
 } as const;
 
 type TopicsMap = Record<string, Topic>;
 type ItemsMap = Record<string, Item>;
 type CuesMap = Record<string, Cue>;
 type SleepSessionsMap = Record<string, SleepSession>;
+type DocumentsMap = Record<string, DocumentAsset>;
 
 type StorageSnapshot = {
   topics: TopicsMap;
@@ -46,6 +50,7 @@ type StorageSnapshot = {
   cueEvents: CueEvent[];
   quizResults: QuizResult[];
   settings: AppSettings;
+  documents: DocumentsMap;
 };
 
 const topicRecordSchema = z.record(topicSchema) as z.ZodType<TopicsMap>;
@@ -55,6 +60,7 @@ const sleepSessionRecordSchema = z
   .record(sleepSessionSchema) as z.ZodType<SleepSessionsMap>;
 const cueEventListSchema = z.array(cueEventSchema) as z.ZodType<CueEvent[]>;
 const quizResultListSchema = z.array(quizResultSchema) as z.ZodType<QuizResult[]>;
+const documentRecordSchema = z.record(documentAssetSchema) as z.ZodType<DocumentsMap>;
 
 const migrations: Record<number, (snapshot: StorageSnapshot) => StorageSnapshot | Promise<StorageSnapshot>> = {};
 
@@ -99,7 +105,7 @@ async function runMigrations(currentVersion: number): Promise<void> {
 }
 
 async function readSnapshot(): Promise<StorageSnapshot> {
-  const [topics, items, cues, sleepSessions, cueEvents, quizResults, settings] = await Promise.all([
+  const [topics, items, cues, sleepSessions, cueEvents, quizResults, settings, documents] = await Promise.all([
     readJson(STORAGE_KEYS.topics, {} as TopicsMap, topicRecordSchema),
     readJson(STORAGE_KEYS.items, {} as ItemsMap, itemRecordSchema),
     readJson(STORAGE_KEYS.cues, {} as CuesMap, cueRecordSchema),
@@ -107,9 +113,10 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     readJson(STORAGE_KEYS.cueEvents, [] as CueEvent[], cueEventListSchema),
     readJson(STORAGE_KEYS.quizResults, [] as QuizResult[], quizResultListSchema),
     readJson(STORAGE_KEYS.settings, defaultSettings, appSettingsSchema),
+    readJson(STORAGE_KEYS.documents, {} as DocumentsMap, documentRecordSchema),
   ]);
 
-  return { topics, items, cues, sleepSessions, cueEvents, quizResults, settings };
+  return { topics, items, cues, sleepSessions, cueEvents, quizResults, settings, documents };
 }
 
 async function writeSnapshot(snapshot: StorageSnapshot): Promise<void> {
@@ -121,6 +128,7 @@ async function writeSnapshot(snapshot: StorageSnapshot): Promise<void> {
     AsyncStorage.setItem(STORAGE_KEYS.cueEvents, JSON.stringify(snapshot.cueEvents)),
     AsyncStorage.setItem(STORAGE_KEYS.quizResults, JSON.stringify(snapshot.quizResults)),
     AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(snapshot.settings)),
+    AsyncStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(snapshot.documents)),
   ]);
 }
 
@@ -158,6 +166,25 @@ function nowIso(): string {
 
 export function generateId(prefix: string = 'id'): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export async function getDocuments(): Promise<DocumentsMap> {
+  await ensureStorageReady();
+  return readJson(STORAGE_KEYS.documents, {} as DocumentsMap, documentRecordSchema);
+}
+
+export async function putDocument(document: DocumentAsset): Promise<DocumentsMap> {
+  const documents = await getDocuments();
+  documents[document.id] = document;
+  await AsyncStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(documents));
+  return documents;
+}
+
+export async function deleteDocument(documentId: string): Promise<DocumentsMap> {
+  const documents = await getDocuments();
+  delete documents[documentId];
+  await AsyncStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(documents));
+  return documents;
 }
 
 export async function getTopics(): Promise<TopicsMap> {

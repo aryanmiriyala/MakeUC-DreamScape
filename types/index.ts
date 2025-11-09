@@ -131,3 +131,14 @@ export const defaultSettings: AppSettings = {
   analyticsEnabled: false,
   lastSyncedAt: undefined,
 };
+
+export const documentAssetSchema = z.object({
+  id: z.string(),
+  originalName: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().int().nonnegative().optional(),
+  localUri: z.string().min(1),
+  uploadedAt: z.string().datetime({ offset: true }),
+});
+
+export type DocumentAsset = z.infer<typeof documentAssetSchema>;
