@@ -610,6 +610,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     marginTop: 10,
   },
+  subtitle: {
+    fontSize: 14,
+  },
   pulseText: {
     marginTop: 4,
   },
