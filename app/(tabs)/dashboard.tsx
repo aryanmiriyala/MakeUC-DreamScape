@@ -25,9 +25,36 @@ export default function DashboardScreen() {
   const sessionList = Object.values(sessions).sort((a, b) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
   );
+  const playedCueEvents = cueEvents.filter((event) => event.status === 'played');
 
-  const recentSessions = sessionList.slice(0, 5);
-  const maxCueCount = Math.max(1, ...recentSessions.map((session) => session.cueIdsPlayed.length));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const lastFiveDays = Array.from({ length: 5 }).map((_, idx) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() - (4 - idx));
+    return date;
+  });
+
+  const dayKeyFromDate = (date: Date) => date.toISOString().slice(0, 10);
+  const dayKeyFromIso = (iso: string) => dayKeyFromDate(new Date(iso));
+
+  const cueEventsByDay = playedCueEvents.reduce<Record<string, number>>((acc, event) => {
+    const key = dayKeyFromIso(event.timestamp);
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const recentBars = lastFiveDays.map((date) => {
+    const key = dayKeyFromDate(date);
+    const cueCount = cueEventsByDay[key] ?? 0;
+    return {
+      key,
+      label: date.toLocaleDateString(undefined, { weekday: 'short' }),
+      cueCount,
+    };
+  });
+
+  const maxCueCount = Math.max(1, ...recentBars.map((bar) => bar.cueCount));
   const totalCues = cueEvents.filter((event) => event.status === 'played').length;
   const averageBoost = sessionList.length
     ? Math.round(
@@ -40,15 +67,14 @@ export default function DashboardScreen() {
       )
     : 0;
 
-  const formatShortDate = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { weekday: 'short' });
-
   const formatLongDate = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
     });
+
+  const historySessions = sessionList.filter((session) => session.cueIdsPlayed.length > 0);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
@@ -84,28 +110,28 @@ export default function DashboardScreen() {
             <ThemedText type="defaultSemiBold">Recent Sessions</ThemedText>
             <ThemedText style={[Typography.caption, { color: muted }]}>Last 5 nights</ThemedText>
           </View>
-          {recentSessions.length === 0 ? (
-            <ThemedText style={{ color: muted }}>No sessions recorded yet.</ThemedText>
-          ) : (
-            <View style={styles.chartRow}>
-              {recentSessions.map((session) => (
-                <View key={session.id} style={styles.chartColumn}>
+          <View style={styles.chartRow}>
+            {recentBars.map((bar) => {
+              const ratio = bar.cueCount / maxCueCount;
+              const heightPercent = Math.max(ratio || 0, 0.12);
+              return (
+                <View key={bar.key} style={styles.chartColumn}>
                   <View
                     style={[
                       styles.chartBar,
                       {
-                        height: `${(session.cueIdsPlayed.length / maxCueCount) * 100}%`,
+                        height: `${heightPercent * 100}%`,
                         backgroundColor: accent,
                       },
                     ]}
                   />
                   <ThemedText style={[Typography.micro, styles.chartLabel, { color: muted }]}>
-                    {formatShortDate(session.startedAt)}
+                    {bar.label}
                   </ThemedText>
                 </View>
-              ))}
-            </View>
-          )}
+              );
+            })}
+          </View>
         </View>
 
         <View style={[styles.card, cardSurface(cardColor)]}>
@@ -113,10 +139,10 @@ export default function DashboardScreen() {
             <ThemedText type="defaultSemiBold">Session History</ThemedText>
             <ThemedText style={[Typography.caption, { color: muted }]}>Chronological log</ThemedText>
           </View>
-          {sessionList.length === 0 ? (
+          {historySessions.length === 0 ? (
             <ThemedText style={{ color: muted }}>Run a Sleep session to populate history.</ThemedText>
           ) : (
-            sessionList.slice(0, 10).map((session, idx, arr) => (
+            historySessions.slice(0, 10).map((session, idx, arr) => (
               <View
                 key={session.id}
                 style={[
@@ -179,18 +205,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     alignItems: 'flex-end',
-    height: 140,
+    height: 90,
+    paddingTop: 4,
   },
   chartColumn: {
     flex: 1,
     alignItems: 'center',
   },
   chartBar: {
-    width: 18,
-    borderRadius: 9,
+    width: 10,
+    borderRadius: 5,
+    backgroundColor: '#2563eb',
   },
   chartLabel: {
-    marginTop: 8,
+    textAlign: 'center',
+    marginTop: 6,
   },
   historyRow: {
     flexDirection: 'row',
