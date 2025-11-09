@@ -336,16 +336,17 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'flex-end',
+    height: '100%',
   },
   topicDeleteAction: {
     width: '100%',
+    height: '100%',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     columnGap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 16,
   },
   topicDeleteText: {
     fontSize: 14,

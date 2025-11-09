@@ -381,16 +381,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-end',
     marginLeft: 12,
+    height: '100%',
   },
   deleteAction: {
     width: '100%',
+    height: '100%',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     columnGap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 16,
   },
   deleteActionText: {
     fontSize: 14,
