@@ -445,3 +445,22 @@ export async function clearQuizResults(): Promise<void> {
   await ensureStorageReady();
   await AsyncStorage.removeItem(STORAGE_KEYS.quizResults);
 }
+
+export async function clearTopicData(): Promise<void> {
+  await ensureStorageReady();
+  await Promise.all([
+    AsyncStorage.removeItem(STORAGE_KEYS.topics),
+    AsyncStorage.removeItem(STORAGE_KEYS.items),
+    AsyncStorage.removeItem(STORAGE_KEYS.cues),
+  ]);
+}
+
+export async function clearAllAppData(): Promise<void> {
+  await ensureStorageReady();
+  await Promise.all([
+    clearTopicData(),
+    clearSleepData(),
+    clearQuizResults(),
+    AsyncStorage.removeItem(STORAGE_KEYS.documents),
+  ]);
+}
