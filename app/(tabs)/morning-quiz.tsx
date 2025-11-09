@@ -9,6 +9,7 @@ import { Typography } from '@/constants/typography';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { generateQuizFromCues, type QuizQuestion } from '@/lib/gemini';
+import { useQuizStore } from '@/store/quizStore';
 import { useSleepStore } from '@/store/sleepStore';
 import { useTopicStore } from '@/store/topicStore';
 
@@ -22,6 +23,7 @@ type Question = {
 export default function MorningQuizScreen() {
   useStoreInitializer(useSleepStore);
   useStoreInitializer(useTopicStore);
+  useStoreInitializer(useQuizStore);
 
   const router = useRouter();
   const cardColor = useThemeColor({}, 'card');
@@ -38,6 +40,7 @@ export default function MorningQuizScreen() {
   const items = useTopicStore((state) => state.items);
   const cues = useTopicStore((state) => state.cues);
   const topics = useTopicStore((state) => state.topics);
+  const recordResult = useQuizStore((state) => state.recordResult);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -49,20 +52,56 @@ export default function MorningQuizScreen() {
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [complete, setComplete] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null);
+  const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
 
   const onSelect = (option: string) => {
     const current = questions[index];
     if (answered) return;
     setSelected(option);
     setAnswered(true);
+    setUserAnswers((prev) => ({ ...prev, [index]: option }));
     if (option === current.answer) {
       setScore((prev) => prev + 1);
     }
   };
 
-  const onNext = () => {
+  const onNext = async () => {
     if (!answered) return;
     if (index === questions.length - 1) {
+      // Quiz completed - record the result
+      const selectedSession = selectedSessionId ? sessions[selectedSessionId] : null;
+      const topicId = selectedSession?.topicId;
+      
+      if (topicId && quizStartTime) {
+        const durationMs = Date.now() - quizStartTime;
+        const totalQuestions = questions.length;
+        const correctAnswers = score + (selected === questions[index].answer ? 1 : 0);
+        const finalScore = Math.round((correctAnswers / totalQuestions) * 100);
+        
+        // Record the final answer
+        const finalAnswers = { ...userAnswers, [index]: selected || '' };
+        
+        try {
+          await recordResult({
+            topicId,
+            sessionId: selectedSessionId || undefined,
+            score: finalScore,
+            items: questions.map((q, idx) => ({
+              itemId: q.id,
+              prompt: q.prompt,
+              userAnswer: finalAnswers[idx] || '',
+              correctAnswer: q.answer,
+              correct: finalAnswers[idx] === q.answer,
+            })),
+            durationMs,
+          });
+          console.log('Quiz result recorded:', { topicId, score: finalScore, durationMs });
+        } catch (error) {
+          console.error('Failed to record quiz result:', error);
+        }
+      }
+      
       setComplete(true);
       return;
     }
@@ -88,11 +127,24 @@ export default function MorningQuizScreen() {
 
   // Get cues from selected session
   const recentCues = useMemo(() => {
-    if (!selectedSessionId) return [];
+    if (!selectedSessionId) {
+      console.log('Morning Quiz: No session ID selected');
+      return [];
+    }
     
     const selectedSession = sessions[selectedSessionId];
-    if (!selectedSession || selectedSession.status !== 'completed') {
-      console.log('Morning Quiz: No valid session selected');
+    if (!selectedSession) {
+      console.log('Morning Quiz: Session not found in store', {
+        selectedSessionId,
+        availableSessions: Object.keys(sessions),
+      });
+      return [];
+    }
+    
+    if (selectedSession.status !== 'completed') {
+      console.log('Morning Quiz: Session not completed', {
+        status: selectedSession.status,
+      });
       return [];
     }
     
@@ -122,10 +174,16 @@ export default function MorningQuizScreen() {
     
     // Fallback: If no cues found but we have a topicId, use all items from that topic
     if (sessionCues.length === 0 && selectedSession.topicId) {
-      console.log('Morning Quiz: Falling back to all items from topic');
+      console.log('Morning Quiz: Falling back to all items from topic', {
+        topicId: selectedSession.topicId,
+        totalItems: Object.keys(items).length,
+        totalTopics: Object.keys(topics).length,
+      });
       const topicItems = Object.values(items).filter(
         (item) => item.topicId === selectedSession.topicId
       );
+      
+      console.log('Morning Quiz: Found topic items:', topicItems.length);
       
       topicItems.forEach((item) => {
         sessionCues.push({
@@ -137,7 +195,7 @@ export default function MorningQuizScreen() {
 
     console.log('Morning Quiz: Found', sessionCues.length, 'cues');
     return sessionCues;
-  }, [selectedSessionId, sessions, cues, items]);
+  }, [selectedSessionId, sessions, cues, items, topics]);
 
   const generateQuestions = useCallback(async () => {
     if (recentCues.length === 0) {
@@ -159,6 +217,7 @@ export default function MorningQuizScreen() {
       }
 
       setQuestions(generatedQuestions);
+      setQuizStartTime(Date.now()); // Start timing when questions are generated
     } catch (error) {
       console.error('Quiz generation failed:', error);
       setGenerationError(
@@ -182,6 +241,8 @@ export default function MorningQuizScreen() {
     setAnswered(false);
     setScore(0);
     setComplete(false);
+    setUserAnswers({});
+    setQuizStartTime(Date.now()); // Restart timer
   };
 
   const backToTopicSelection = () => {
@@ -193,6 +254,8 @@ export default function MorningQuizScreen() {
     setAnswered(false);
     setScore(0);
     setComplete(false);
+    setUserAnswers({});
+    setQuizStartTime(null);
     setShouldAutoGenerate(false); // Prevent auto-generation, show selector instead
   };
 
@@ -211,6 +274,8 @@ export default function MorningQuizScreen() {
     setAnswered(false);
     setScore(0);
     setComplete(false);
+    setUserAnswers({});
+    setQuizStartTime(null);
   };
 
   const handleDeleteSession = useCallback(
