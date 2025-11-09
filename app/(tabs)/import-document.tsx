@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PageHeading } from '@/components/page-heading';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
-import { cardShadow } from '@/constants/shadow';
+import { cardSurface } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { summarizeDocumentWithGemini } from '@/lib/gemini';
@@ -250,14 +251,13 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <ThemedText type="subtitle">Import Document</ThemedText>
-          <ThemedText style={[Typography.caption, { color: muted }]}>
-            Upload PDF or TXT files for Gemini to summarize.
-          </ThemedText>
-        </View>
+        <PageHeading
+          title="Import Document"
+          subtitle="Upload PDF or TXT files for Gemini to summarize."
+          spacing={24}
+        />
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, cardSurface(cardColor)]}>
           <ThemedText type="defaultSemiBold">1. Upload file</ThemedText>
           {selectedFile ? (
             <View style={styles.fileRow}>
@@ -303,14 +303,13 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
           )}
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, cardSurface(cardColor)]}>
           <ThemedText type="defaultSemiBold">2. Generate cues (Gemini)</ThemedText>
           <AppButton
             label="✨ Generate Cues (Gemini)"
             onPress={generateCues}
             loading={isGenerating}
             disabled={!hasUploaded}
-            variant="secondary"
           />
 
           {isGenerating && (
@@ -328,7 +327,7 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
           )}
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, cardSurface(cardColor)]}>
           <ThemedText type="defaultSemiBold">3. Review cues</ThemedText>
           {cues.length === 0 ? (
             <ThemedText style={[Typography.caption, { color: muted }]}>
@@ -371,16 +370,12 @@ const styles = StyleSheet.create({
     gap: 20,
     overflow: 'visible',
   },
-  header: {
-    gap: 4,
-  },
   card: {
-    ...cardShadow,
-    borderWidth: 0,
     borderRadius: 18,
     padding: 18,
     gap: 12,
-    marginHorizontal: 2,
+    marginHorizontal: 8,
+    marginTop: 8,
   },
   fileRow: {
     flexDirection: 'row',
