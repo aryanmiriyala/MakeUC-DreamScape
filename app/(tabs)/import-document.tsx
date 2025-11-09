@@ -19,14 +19,7 @@ import { generateId, putDocument } from '@/lib/storage';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useTopicStore } from '@/store/topicStore';
 
-const SUPPORTED_MIME_TYPES = [
-  'application/pdf',
-  'text/plain',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-] as const;
+const SUPPORTED_MIME_TYPES = ['application/pdf', 'text/plain'] as const;
 
 type SupportedMimeType = (typeof SUPPORTED_MIME_TYPES)[number];
 
@@ -118,7 +111,7 @@ export default function ImportDocumentScreen() {
         (asset.mimeType as SupportedMimeType | undefined) ?? inferMimeFromName(asset.name);
 
       if (!inferredMime || !SUPPORTED_MIME_TYPES.includes(inferredMime)) {
-        setPickerError('Please select a PDF, TXT, Word, or PowerPoint file.');
+        setPickerError('Please select a PDF or TXT file.');
         return;
       }
 
@@ -266,7 +259,7 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
         <View style={styles.header}>
           <ThemedText type="subtitle">Import Document</ThemedText>
           <ThemedText style={[Typography.caption, { color: muted }]}>
-            Upload PDFs or TXT files (Word & PowerPoint also supported) for Gemini to summarize.
+            Upload PDF or TXT files for Gemini to summarize.
           </ThemedText>
         </View>
 
@@ -462,13 +455,7 @@ function truncateFileName(name: string, maxLength = 15): string {
 function fileBadge(mime: SupportedMimeType): string {
   if (mime === 'application/pdf') return 'PDF';
   if (mime === 'text/plain') return 'TXT';
-  if (
-    mime === 'application/msword' ||
-    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ) {
-    return 'Word';
-  }
-  return 'Slides';
+  return 'File';
 }
 
 function inferMimeFromName(name?: string): SupportedMimeType | undefined {
@@ -476,14 +463,6 @@ function inferMimeFromName(name?: string): SupportedMimeType | undefined {
   const lowered = name.toLowerCase();
   if (lowered.endsWith('.pdf')) return 'application/pdf';
   if (lowered.endsWith('.txt')) return 'text/plain';
-  if (lowered.endsWith('.doc')) return 'application/msword';
-  if (lowered.endsWith('.docx')) {
-    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  }
-  if (lowered.endsWith('.ppt')) return 'application/vnd.ms-powerpoint';
-  if (lowered.endsWith('.pptx')) {
-    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-  }
   return undefined;
 }
 

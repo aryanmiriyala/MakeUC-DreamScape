@@ -8,6 +8,15 @@
     "scheme": "dreamscape",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#020617",
+      "dark": {
+        "backgroundColor": "#020617",
+        "image": "./assets/images/splash-icon.png"
+      }
+    },
     "ios": {
       "supportsTablet": true
     },

@@ -1,5 +1,10 @@
-import { useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
+
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -28,6 +33,7 @@ export default function AddFlashcardsScreen() {
   const items = useTopicStore((state) => state.items);
   const cues = useTopicStore((state) => state.cues);
   const addItem = useTopicStore((state) => state.addItem);
+  const removeTopic = useTopicStore((state) => state.removeTopic);
   const loading = useTopicStore((state) => state.loading);
 
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
@@ -47,6 +53,34 @@ export default function AddFlashcardsScreen() {
     setFront('');
     setBack('');
   };
+
+  const confirmDeleteTopic = useCallback(
+    (topicId: string, topicName: string) => {
+      Alert.alert(
+        'Delete topic?',
+        `“${topicName}” and its flashcards will be removed.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await removeTopic(topicId);
+                if (activeTopicId === topicId) {
+                  closeModal();
+                }
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unable to delete topic.';
+                Alert.alert('Delete failed', message);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [activeTopicId, removeTopic]
+  );
 
   const topicArray = useMemo(() => Object.values(topics), [topics]);
   const itemCounts = useMemo(() => {
@@ -125,16 +159,18 @@ export default function AddFlashcardsScreen() {
             const cardCount = itemCounts[topic.id] ?? 0;
             const cueCount = cueCounts[topic.id] ?? 0;
             return (
-              <TopicCard
-              key={topic.id}
-              title={topic.name}
-              subtitle={`${cardCount} cards • ${cueCount} cues`}
-              onPress={() => openTopic(topic.id)}
-              cardColor={cardColor}
-              borderColor={borderColor}
-              muted={muted}
-            />
-          )})}
+              <SwipeableTopicCard
+                key={topic.id}
+                title={topic.name}
+                subtitle={`${cardCount} cards • ${cueCount} cues`}
+                onPress={() => openTopic(topic.id)}
+                cardColor={cardColor}
+                borderColor={borderColor}
+                muted={muted}
+                onDelete={() => confirmDeleteTopic(topic.id, topic.name)}
+              />
+            );
+          })}
           {loading && (
             <ThemedText style={{ color: muted }}>Loading topics…</ThemedText>
           )}
@@ -236,6 +272,46 @@ const TopicCard = ({ title, subtitle, onPress, cardColor, borderColor, muted }: 
   </TouchableOpacity>
 );
 
+type SwipeableTopicCardProps = TopicCardProps & {
+  onDelete: () => void;
+};
+
+const SwipeableTopicCard = ({ onDelete, ...rest }: SwipeableTopicCardProps) => {
+  const swipeRef = useRef<Swipeable | null>(null);
+  const danger = useThemeColor({}, 'danger');
+  const cardColor = useThemeColor({}, 'card');
+
+  const handleDelete = () => {
+    swipeRef.current?.close();
+    onDelete();
+  };
+
+  const renderActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [110, 0] });
+    return (
+      <Animated.View style={[styles.topicDeleteWrapper, { transform: [{ translateX }] }]}> 
+        <TouchableOpacity style={[styles.topicDeleteAction, { backgroundColor: danger }]} onPress={handleDelete}>
+          <Ionicons name="trash" size={18} color={cardColor} />
+          <ThemedText type="defaultSemiBold" style={[styles.topicDeleteText, { color: cardColor }]}>
+            Delete
+          </ThemedText>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      overshootRight={false}
+      renderRightActions={(progress) => renderActions(progress)}
+      rightThreshold={40}
+      friction={2}>
+      <TopicCard {...rest} />
+    </Swipeable>
+  );
+};
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -254,6 +330,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
+  },
+  topicDeleteWrapper: {
+    width: 110,
+    marginLeft: 12,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  topicDeleteAction: {
+    width: '100%',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    columnGap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  topicDeleteText: {
+    fontSize: 14,
   },
   modalBackdrop: {
     flex: 1,

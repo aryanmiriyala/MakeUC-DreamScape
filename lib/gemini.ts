@@ -37,6 +37,7 @@ export async function summarizeDocumentWithGemini({
     encoding: base64Encoding,
   });
 
+  const safeMimeType = sanitizeMimeType(mimeType);
   const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
     method: 'POST',
     headers: {
@@ -61,7 +62,7 @@ export async function summarizeDocumentWithGemini({
             },
             {
               inlineData: {
-                mimeType,
+                mimeType: safeMimeType,
                 data: base64,
               },
             },
@@ -119,4 +120,11 @@ function sanitizeGeminiJson(raw: string): string {
       .trim();
   }
   return trimmed;
+}
+
+function sanitizeMimeType(mime: string): string {
+  if (mime === 'application/pdf' || mime === 'text/plain') {
+    return mime;
+  }
+  return 'text/plain';
 }

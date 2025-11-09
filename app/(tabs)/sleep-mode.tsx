@@ -1,4 +1,5 @@
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 import { useFocusEffect } from 'expo-router';
 import { ScrollView } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -56,7 +57,10 @@ export default function SleepModeScreen() {
   const [isPreparing, setIsPreparing] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const playbackSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const playbackResolveRef = useRef<(() => void) | null>(null);
+  const playbackRejectRef = useRef<((error: Error) => void) | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const statusRef = useRef<SessionStatus>('idle');
   const preparedRef = useRef<PreparedCue[]>([]);
@@ -80,9 +84,25 @@ export default function SleepModeScreen() {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      if (soundRef.current) {
-        void soundRef.current.unloadAsync();
-        soundRef.current = null;
+      if (playbackSubscriptionRef.current) {
+        playbackSubscriptionRef.current.remove();
+        playbackSubscriptionRef.current = null;
+      }
+      if (playbackResolveRef.current) {
+        playbackResolveRef.current();
+        playbackResolveRef.current = null;
+        playbackRejectRef.current = null;
+      } else {
+        playbackRejectRef.current = null;
+      }
+      if (playerRef.current) {
+        try {
+          playerRef.current.pause();
+        } catch (_error) {
+          // player might already be released
+        }
+        playerRef.current.remove();
+        playerRef.current = null;
       }
     };
   }, []);
@@ -147,15 +167,46 @@ export default function SleepModeScreen() {
     return list;
   }, [activeItems, cues, selectedTopicId]);
 
+  const settlePlaybackPromise = useCallback(
+    (type: 'resolve' | 'reject', error?: Error) => {
+      if (type === 'resolve' && playbackResolveRef.current) {
+        playbackResolveRef.current();
+      }
+      if (type === 'reject' && playbackRejectRef.current) {
+        playbackRejectRef.current(error ?? new Error('Playback stopped'));
+      }
+      playbackResolveRef.current = null;
+      playbackRejectRef.current = null;
+    },
+    []
+  );
+
   const cleanupAudio = useCallback(async () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
+    if (playbackSubscriptionRef.current) {
+      playbackSubscriptionRef.current.remove();
+      playbackSubscriptionRef.current = null;
     }
+    settlePlaybackPromise('resolve');
+    if (playerRef.current) {
+      try {
+        playerRef.current.pause();
+      } catch (_error) {
+        // no-op
+      }
+      playerRef.current.remove();
+      playerRef.current = null;
+    }
+  }, [settlePlaybackPromise]);
+
+  const ensurePlayer = useCallback(() => {
+    if (!playerRef.current) {
+      playerRef.current = createAudioPlayer(null, { updateInterval: 250, keepAudioSessionActive: true });
+    }
+    return playerRef.current;
   }, []);
 
   const stopSleepSession = useCallback(
@@ -206,13 +257,34 @@ export default function SleepModeScreen() {
       }
 
       try {
-        if (soundRef.current) {
-          await soundRef.current.stopAsync();
-          await soundRef.current.unloadAsync();
+        const player = ensurePlayer();
+        if (playbackSubscriptionRef.current) {
+          playbackSubscriptionRef.current.remove();
+          playbackSubscriptionRef.current = null;
         }
 
-        const { sound } = await Audio.Sound.createAsync({ uri: cue.uri });
-        soundRef.current = sound;
+        const playbackCompleted = new Promise<void>((resolve, reject) => {
+          playbackResolveRef.current = resolve;
+          playbackRejectRef.current = reject;
+          playbackSubscriptionRef.current = player.addListener('playbackStatusUpdate', (status) => {
+            if (!status.isLoaded) {
+              if (status.playbackState === 'failed') {
+                playbackSubscriptionRef.current?.remove();
+                playbackSubscriptionRef.current = null;
+                settlePlaybackPromise('reject', new Error('Cue playback failed.'));
+              }
+              return;
+            }
+
+            if (status.didJustFinish) {
+              playbackSubscriptionRef.current?.remove();
+              playbackSubscriptionRef.current = null;
+              settlePlaybackPromise('resolve');
+            }
+          });
+        });
+
+        player.replace({ uri: cue.uri });
         currentCueIndexRef.current = index;
         setCuesPlayed((count) => count + 1);
         playedCueIdsRef.current.add(cue.cueId ?? cue.itemId);
@@ -233,23 +305,18 @@ export default function SleepModeScreen() {
           });
         }
 
-        await sound.playAsync();
-        return new Promise<void>((resolve) => {
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (!status.isLoaded) return;
-            if (status.didJustFinish) {
-              sound.setOnPlaybackStatusUpdate(null);
-              resolve();
-            }
-          });
-        });
+        player.play();
+        await playbackCompleted;
       } catch (error) {
+        settlePlaybackPromise('reject', error instanceof Error ? error : new Error('Unable to play cue'));
         console.error('SleepMode cue playback failed', error);
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to play cue');
-        void stopSleepSession('error');
+        if (statusRef.current !== 'idle') {
+          setErrorMessage(error instanceof Error ? error.message : 'Unable to play cue');
+          void stopSleepSession('error');
+        }
       }
     },
-    [logCueEvent, stopSleepSession]
+    [ensurePlayer, logCueEvent, settlePlaybackPromise, stopSleepSession]
   );
 
   const handleStart = useCallback(async () => {
@@ -271,7 +338,7 @@ export default function SleepModeScreen() {
     playedCueIdsRef.current.clear();
 
     try {
-      await Audio.setAudioModeAsync({
+      await setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,

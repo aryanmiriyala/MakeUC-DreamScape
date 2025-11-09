@@ -1,7 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
+
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Animated,
   FlatList,
   Image,
   ScrollView,
@@ -68,12 +73,38 @@ export default function HomeScreen() {
   const items = useTopicStore((state) => state.items);
   const cues = useTopicStore((state) => state.cues);
   const loading = useTopicStore((state) => state.loading);
+  const removeTopic = useTopicStore((state) => state.removeTopic);
+
+  const confirmDeleteTopic = useCallback(
+    (topicId: string, topicName: string) => {
+      Alert.alert(
+        'Delete topic?',
+        `“${topicName}” and all its flashcards/cues will be removed.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              void removeTopic(topicId).catch((error) => {
+                const message = error instanceof Error ? error.message : 'Unable to delete topic.';
+                Alert.alert('Delete failed', message);
+              });
+            },
+          },
+        ]
+      );
+    },
+    [removeTopic]
+  );
 
   const renderTopic: ListRenderItem<TopicRow> = ({ item }) => (
-    <TopicCard
+    <SwipeableTopicRow
+      key={item.id}
       title={item.name}
       subtitle={`${item.cards} cards • ${item.cueCount} cues`}
       onPress={() => router.push({ pathname: '/add-flashcards', params: { topicId: item.id } })}
+      onDelete={() => confirmDeleteTopic(item.id, item.name)}
     />
   );
 
@@ -226,10 +257,53 @@ const TopicCard = ({ title, subtitle, onPress }: TopicCardProps) => {
       style={[styles.topicCard, { backgroundColor: cardColor, borderColor }]}
       onPress={onPress}>
       <ThemedText type="defaultSemiBold">{title}</ThemedText>
-      <ThemedText style={[Typography.caption, styles.topicMeta, { color: muted }]}>
+      <ThemedText style={[Typography.caption, styles.topicMeta, { color: muted }]}> 
         {subtitle}
       </ThemedText>
     </TouchableOpacity>
+  );
+};
+
+type SwipeableTopicRowProps = {
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  onDelete: () => void;
+};
+
+const SwipeableTopicRow = ({ title, subtitle, onPress, onDelete }: SwipeableTopicRowProps) => {
+  const swipeRef = useRef<Swipeable | null>(null);
+  const danger = useThemeColor({}, 'danger');
+  const cardColor = useThemeColor({}, 'card');
+
+  const closeAndDelete = () => {
+    swipeRef.current?.close();
+    onDelete();
+  };
+
+  const renderActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [110, 0] });
+    return (
+      <Animated.View style={[styles.deleteActionWrapper, { transform: [{ translateX }] }]}> 
+        <TouchableOpacity style={[styles.deleteAction, { backgroundColor: danger }]} onPress={closeAndDelete}>
+          <Ionicons name="trash" size={18} color={cardColor} />
+          <ThemedText type="defaultSemiBold" style={[styles.deleteActionText, { color: cardColor }]}>
+            Delete
+          </ThemedText>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderRightActions={(progress) => renderActions(progress)}
+      rightThreshold={40}
+      overshootRight={false}
+      friction={2}>
+      <TopicCard title={title} subtitle={subtitle} onPress={onPress} />
+    </Swipeable>
   );
 };
 
@@ -301,6 +375,25 @@ const styles = StyleSheet.create({
   },
   topicMeta: {
     marginTop: 8,
+  },
+  deleteActionWrapper: {
+    width: 110,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginLeft: 12,
+  },
+  deleteAction: {
+    width: '100%',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    columnGap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  deleteActionText: {
+    fontSize: 14,
   },
   separator: {
     height: 12,
