@@ -147,7 +147,7 @@ type ActionButtonProps = {
     base: string;
     halo: string;
   };
-  icon?: string;
+  icon?: any;
   onPress: () => void;
 };
 
