@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { cardShadow } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
@@ -116,19 +117,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   metricCard: {
+    ...cardShadow,
     flex: 1,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
+    marginHorizontal: 2,
   },
   metricLabel: {
     marginBottom: 8,
   },
   card: {
+    ...cardShadow,
     borderWidth: 1,
     borderRadius: 18,
     padding: 18,
     gap: 16,
+    marginHorizontal: 2,
+    marginTop: 8,
   },
   cardHeader: {
     flexDirection: 'row',

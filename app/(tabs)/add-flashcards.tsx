@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -16,12 +17,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AppButton } from '@/components/ui/app-button';
+import { cardShadow } from '@/constants/shadow';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useTopicStore } from '@/store/topicStore';
 
 export default function AddFlashcardsScreen() {
   useStoreInitializer(useTopicStore);
+
+  const router = useRouter();
 
   const cardColor = useThemeColor({}, 'card');
   const borderColor = useThemeColor({}, 'border');
@@ -144,15 +149,24 @@ export default function AddFlashcardsScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
         <View style={styles.header}>
-          <ThemedText type="subtitle">Topics</ThemedText>
+          <View style={styles.headerRow}>
+            <ThemedText type="subtitle">Topics</ThemedText>
+            <TouchableOpacity
+              style={styles.addTopicButton}
+              onPress={() => router.push('/import-document')}
+              accessibilityRole="button"
+              accessibilityLabel="Add topic">
+              <Ionicons name="add" size={20} color="#0f1115" />
+            </TouchableOpacity>
+          </View>
           <ThemedText style={{ color: muted }}>
-            Tap a topic to view flashcards, add cues, or preview audio.
+            Tap a topic to view flashcards, add cues, or import new material.
           </ThemedText>
         </View>
         <View style={styles.topicList}>
           {topicArray.length === 0 && !loading && (
             <ThemedText style={{ color: muted }}>
-              No topics yet. Create one from the Home screen to start adding flashcards.
+              No topics yet. Tap + above to import a document and create one.
             </ThemedText>
           )}
           {topicArray.map((topic) => {
@@ -210,17 +224,12 @@ export default function AddFlashcardsScreen() {
               {formError && (
                 <ThemedText style={[styles.errorText, { color: primary }]}>{formError}</ThemedText>
               )}
-              <TouchableOpacity
+              <AppButton
+                label={isSaving ? 'Saving…' : 'Add Flashcard'}
                 onPress={onAddFlashcard}
-                disabled={!canSave || isSaving}
-                style={[
-                  styles.primaryButton,
-                  { backgroundColor: primary, opacity: canSave && !isSaving ? 1 : 0.4 },
-                ]}>
-                <ThemedText type="defaultSemiBold" style={styles.primaryText}>
-                  {isSaving ? 'Saving…' : 'Add Flashcard'}
-                </ThemedText>
-              </TouchableOpacity>
+                loading={isSaving}
+                disabled={!canSave}
+              />
 
               <ThemedText type="subtitle" style={styles.listHeading}>
                 Flashcards
@@ -265,7 +274,7 @@ type TopicCardProps = {
 
 const TopicCard = ({ title, subtitle, onPress, cardColor, borderColor, muted }: TopicCardProps) => (
   <TouchableOpacity
-    style={[styles.topicCard, { backgroundColor: cardColor, borderColor }]}
+    style={[styles.topicCard, { backgroundColor: cardColor }]}
     onPress={onPress}>
     <ThemedText type="defaultSemiBold">{title}</ThemedText>
     <ThemedText style={{ color: muted, marginTop: 6 }}>{subtitle}</ThemedText>
@@ -306,8 +315,12 @@ const SwipeableTopicCard = ({ onDelete, ...rest }: SwipeableTopicCardProps) => {
       overshootRight={false}
       renderRightActions={(progress) => renderActions(progress)}
       rightThreshold={40}
-      friction={2}>
-      <TopicCard {...rest} />
+      friction={2}
+      containerStyle={styles.swipeContainer}
+      childrenContainerStyle={styles.swipeChildren}>
+      <View style={styles.topicCardWrapper}>
+        <TopicCard {...rest} />
+      </View>
     </Swipeable>
   );
 };
@@ -323,11 +336,39 @@ const styles = StyleSheet.create({
   header: {
     gap: 4,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addTopicButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#9aed77',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   topicList: {
     gap: 12,
+    overflow: 'visible',
+    paddingVertical: 4,
+  },
+  swipeContainer: {
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+  },
+  swipeChildren: {
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+  },
+  topicCardWrapper: {
+    marginHorizontal: 8,
+    marginTop: 8,
   },
   topicCard: {
-    borderWidth: 1,
+    ...cardShadow,
+    borderWidth: 0,
     borderRadius: 16,
     padding: 16,
   },
@@ -358,10 +399,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalCard: {
+    ...cardShadow,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: 20,
     maxHeight: '90%',
+    marginHorizontal: 4,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -374,6 +417,7 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     gap: 12,
+    overflow: 'visible',
   },
   input: {
     borderWidth: 1,
@@ -382,21 +426,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 56,
   },
-  primaryButton: {
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  primaryText: {
-    color: '#ffffff',
-  },
   listHeading: {
     marginTop: 12,
   },
   flashcard: {
-    borderWidth: 1,
+    ...cardShadow,
+    borderWidth: 0,
     borderRadius: 16,
     padding: 16,
+    marginHorizontal: 4,
     marginTop: 10,
   },
   flashcardBack: {

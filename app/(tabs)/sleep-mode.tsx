@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AppButton } from '@/components/ui/app-button';
+import { cardShadow } from '@/constants/shadow';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { fetchCueAudio } from '@/lib/elevenlabs';
 import { useSleepStore } from '@/store/sleepStore';
@@ -339,10 +341,11 @@ export default function SleepModeScreen() {
 
     try {
       await setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: 'duckOthers',
+        interruptionModeAndroid: 'duckOthers',
       });
 
       const prepared: PreparedCue[] = [];
@@ -430,6 +433,7 @@ export default function SleepModeScreen() {
         { paddingTop: insets.top + 12 },
       ]}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(24, insets.bottom + 16) },
@@ -441,7 +445,7 @@ export default function SleepModeScreen() {
           Simulate spaced cues with TTS while resting.
         </ThemedText>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
           <ThemedText>Status: {statusLabel}</ThemedText>
           <ThemedText style={{ color: muted }}>Cues played: {cuesPlayed}</ThemedText>
           <Animated.Text style={[styles.pulseText, { color: muted }, pulseStyle]}>
@@ -449,7 +453,7 @@ export default function SleepModeScreen() {
           </Animated.Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
           <ThemedText type="defaultSemiBold">Select topic</ThemedText>
           <View style={styles.topicRow}>
             {topicsLoading && topicOptions.length === 0 ? (
@@ -514,7 +518,7 @@ export default function SleepModeScreen() {
         </View>
 
         {preparedCues.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+          <View style={[styles.card, { backgroundColor: cardColor }]}>
             <ThemedText type="defaultSemiBold">Queued cues</ThemedText>
             <View style={styles.cueList}>
               {preparedCues.map((cue) => (
@@ -527,7 +531,7 @@ export default function SleepModeScreen() {
         ) : null}
 
         {errorMessage ? (
-          <View style={[styles.card, { borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
+          <View style={[styles.card, { borderWidth: 1, borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
             <ThemedText type="defaultSemiBold" style={{ color: '#7f1d1d' }}>
               {errorMessage}
             </ThemedText>
@@ -535,22 +539,22 @@ export default function SleepModeScreen() {
         ) : null}
 
         <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: success, opacity: status === 'idle' ? 1 : 0.6 }]}
+          <AppButton
+            label={isPreparing ? 'Preparing…' : 'Start Session'}
             onPress={handleStart}
-            disabled={status !== 'idle' || isPreparing}>
-            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
-              {isPreparing ? 'Preparing…' : 'Start Sleep Session'}
-            </ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: danger, opacity: status === 'playing' ? 1 : 0.4 }]}
+            loading={isPreparing}
+            disabled={status !== 'idle'}
+            fullWidth={false}
+            style={styles.actionButton}
+          />
+          <AppButton
+            label="Stop"
             onPress={handleStop}
-            disabled={status !== 'playing'}>
-            <ThemedText type="defaultSemiBold" style={styles.buttonText}>
-              Stop
-            </ThemedText>
-          </TouchableOpacity>
+            disabled={status !== 'playing'}
+            variant="danger"
+            fullWidth={false}
+            style={styles.actionButton}
+          />
         </View>
       </ScrollView>
     </ThemedView>
@@ -562,17 +566,24 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
+  scroll: {
+    overflow: 'visible',
+  },
   content: {
     gap: 16,
+    overflow: 'visible',
   },
   subtitle: {
     fontSize: 14,
   },
   card: {
-    borderWidth: 1,
+    ...cardShadow,
+    borderWidth: 0,
     borderRadius: 16,
     padding: 18,
     gap: 8,
+    marginHorizontal: 4,
+    marginTop: 8,
   },
   pulseText: {
     marginTop: 4,
@@ -606,14 +617,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 24,
   },
-  primaryButton: {
+  actionButton: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#ffffff',
   },
   cueList: {
     gap: 6,

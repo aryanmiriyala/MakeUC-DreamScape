@@ -15,13 +15,33 @@ const tabConfig = [
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: palette.tint,
+        tabBarInactiveTintColor: palette.icon,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          height: 90,
+          paddingBottom: 14,
+          paddingTop: 18,
+          backgroundColor: palette.card,
+          borderTopWidth: 1,
+          borderColor: palette.border,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 0,
+          marginTop: -4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginTop: 0,
+        },
+        tabBarHideOnKeyboard: true,
       }}>
       {tabConfig.map((tab) => (
         <Tabs.Screen

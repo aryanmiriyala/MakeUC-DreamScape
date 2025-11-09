@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { AppButton } from '@/components/ui/app-button';
+import { cardShadow } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { summarizeDocumentWithGemini } from '@/lib/gemini';
@@ -20,6 +22,7 @@ import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useTopicStore } from '@/store/topicStore';
 
 const SUPPORTED_MIME_TYPES = ['application/pdf', 'text/plain'] as const;
+const PICKER_MIME_TYPES: string[] = [...SUPPORTED_MIME_TYPES];
 
 type SupportedMimeType = (typeof SUPPORTED_MIME_TYPES)[number];
 
@@ -82,25 +85,16 @@ export default function ImportDocumentScreen() {
     setIsPicking(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: SUPPORTED_MIME_TYPES,
+        type: PICKER_MIME_TYPES,
         copyToCacheDirectory: true,
         multiple: false,
       });
 
-      const canceled = 'canceled' in result ? result.canceled : result.type === 'cancel';
-      if (canceled) {
+      if (result.canceled) {
         return;
       }
 
-      const asset =
-        'assets' in result
-          ? result.assets?.[0]
-          : ({
-              uri: result.uri,
-              name: result.name,
-              size: result.size,
-              mimeType: result.mimeType,
-            } as DocumentPicker.DocumentPickerAsset);
+      const asset = result.assets?.[0];
 
       if (!asset) {
         setPickerError('Unable to read selected file.');
@@ -291,22 +285,12 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
             </ThemedText>
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.outlineButton,
-              {
-                borderColor,
-                backgroundColor: accent,
-                opacity: primaryBusy ? 0.5 : 1,
-              },
-            ]}
+          <AppButton
+            label={primaryBusy ? '⏳ Working…' : primaryLabel}
             onPress={primaryAction}
+            loading={primaryBusy}
             disabled={primaryBusy}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.primaryText}>
-              {primaryBusy ? '⏳ Working…' : primaryLabel}
-            </ThemedText>
-          </TouchableOpacity>
+          />
           {pickerError && (
             <ThemedText style={[Typography.caption, styles.errorText, { color: accent }]}>
               {pickerError}
@@ -321,18 +305,13 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
 
         <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText type="defaultSemiBold">2. Generate cues (Gemini)</ThemedText>
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              { backgroundColor: accent, opacity: hasUploaded ? 1 : 0.4 },
-            ]}
-            disabled={!hasUploaded || isGenerating}
+          <AppButton
+            label="✨ Generate Cues (Gemini)"
             onPress={generateCues}
-          >
-            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
-              ✨ Generate Cues (Gemini)
-            </ThemedText>
-          </TouchableOpacity>
+            loading={isGenerating}
+            disabled={!hasUploaded}
+            variant="secondary"
+          />
 
           {isGenerating && (
             <View style={styles.loadingRow}>
@@ -366,18 +345,12 @@ const primaryBusy = (!hasSelection && isPicking) || (shouldUpload && isUploading
             ))
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              { backgroundColor: primary, opacity: saveDisabled ? 0.4 : 1 },
-            ]}
-            disabled={saveDisabled}
+          <AppButton
+            label={isSavingTopic ? 'Saving…' : '💾 Save to Topic'}
             onPress={saveTopicWithCues}
-          >
-            <ThemedText type="defaultSemiBold" style={[Typography.bodySemi, styles.primaryText]}>
-              {isSavingTopic ? 'Saving…' : '💾 Save to Topic'}
-            </ThemedText>
-          </TouchableOpacity>
+            loading={isSavingTopic}
+            disabled={saveDisabled}
+          />
           {topicStatus && (
             <ThemedText style={[Typography.caption, styles.successText, { color: primary }]}>
               {topicStatus}
@@ -396,34 +369,22 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     gap: 20,
+    overflow: 'visible',
   },
   header: {
     gap: 4,
   },
   card: {
-    borderWidth: 1,
+    ...cardShadow,
+    borderWidth: 0,
     borderRadius: 18,
     padding: 18,
     gap: 12,
+    marginHorizontal: 2,
   },
   fileRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  outlineButton: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  primaryButton: {
-    marginTop: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  primaryText: {
-    color: '#ffffff',
   },
   loadingRow: {
     flexDirection: 'row',
@@ -478,10 +439,6 @@ function resolveExtension(file: FileMeta): string {
   const mimeToExtension: Record<SupportedMimeType, string> = {
     'application/pdf': '.pdf',
     'text/plain': '.txt',
-    'application/msword': '.doc',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-    'application/vnd.ms-powerpoint': '.ppt',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
   };
 
   if (mimeToExtension[file.mimeType]) {
