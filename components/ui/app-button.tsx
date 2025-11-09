@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { CARD_SHADOW } from '@/constants/shadow';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -43,7 +44,7 @@ export const AppButton = forwardRef<View, AppButtonProps>(
       fullWidth = true,
       leadingIcon,
       trailingIcon,
-      style,
+      style: customStyle,
     },
     ref
   ) => {
@@ -54,6 +55,19 @@ export const AppButton = forwardRef<View, AppButtonProps>(
 
     const sizeStyle = size === 'lg' ? styles.sizeLg : styles.sizeMd;
     const isDisabled = disabled || loading;
+    const usesShadow = backgroundColor !== 'transparent';
+    const buttonVisualStyle = usesShadow
+      ? {
+          ...CARD_SHADOW,
+          backgroundColor,
+          borderColor,
+          borderWidth: variant === 'outline' ? 1 : 0,
+        }
+      : {
+          backgroundColor,
+          borderColor,
+          borderWidth: 1,
+        };
 
     const renderContent = () => {
       if (loading) {
@@ -71,23 +85,37 @@ export const AppButton = forwardRef<View, AppButtonProps>(
       );
     };
 
+    const baseStyle: StyleProp<ViewStyle>[] = [
+      styles.base,
+      sizeStyle,
+      buttonVisualStyle,
+      {
+        opacity: isDisabled ? 0.6 : 1,
+        width: fullWidth ? '100%' : undefined,
+      },
+    ];
+
     return (
       <Pressable
         ref={ref}
         disabled={isDisabled}
         onPress={onPress}
-        style={(state) => [
-          styles.base,
-          sizeStyle,
-          {
-            opacity: isDisabled ? 0.6 : 1,
-            backgroundColor,
-            borderColor,
-            transform: state.pressed && !isDisabled ? [{ scale: 0.98 }] : undefined,
-            width: fullWidth ? '100%' : undefined,
-          },
-          typeof style === 'function' ? (style as (state: PressableStateCallbackType) => StyleProp<ViewStyle>)(state) : style,
-        ]}>
+        style={(pressState) => {
+          const resolvedStyle =
+            typeof customStyle === 'function'
+              ? (customStyle as (state: PressableStateCallbackType) => StyleProp<ViewStyle>)(pressState)
+              : customStyle;
+
+          const composedStyle: StyleProp<ViewStyle>[] = [...baseStyle];
+
+          if (pressState.pressed && !isDisabled) {
+            composedStyle.push(styles.pressed);
+          }
+
+          appendStyle(composedStyle, resolvedStyle);
+
+          return composedStyle;
+        }}>
         {renderContent()}
       </Pressable>
     );
@@ -128,7 +156,6 @@ function resolveColors(variant: ButtonVariant, palette: typeof Colors.light) {
 const styles = StyleSheet.create({
   base: {
     borderRadius: 18,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -153,4 +180,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pressed: {
+    transform: [{ scale: 0.98 }],
+  },
 });
+
+function appendStyle(target: StyleProp<ViewStyle>[], value?: StyleProp<ViewStyle>) {
+  if (value === null || value === undefined || value === false) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      appendStyle(target, entry);
+    }
+    return;
+  }
+
+  target.push(value);
+}

@@ -15,10 +15,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PageHeading } from '@/components/page-heading';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppButton } from '@/components/ui/app-button';
-import { cardShadow } from '@/constants/shadow';
+import { cardSurface, CARD_SHADOW } from '@/constants/shadow';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
 import { useTopicStore } from '@/store/topicStore';
@@ -148,9 +149,10 @@ export default function AddFlashcardsScreen() {
     <ThemedView style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <ThemedText type="subtitle">Topics</ThemedText>
+        <PageHeading
+          title="Topics"
+          subtitle="Tap a topic to view flashcards, add cues, or import new material."
+          actionSlot={
             <TouchableOpacity
               style={styles.addTopicButton}
               onPress={() => router.push('/import-document')}
@@ -158,11 +160,8 @@ export default function AddFlashcardsScreen() {
               accessibilityLabel="Add topic">
               <Ionicons name="add" size={20} color="#0f1115" />
             </TouchableOpacity>
-          </View>
-          <ThemedText style={{ color: muted }}>
-            Tap a topic to view flashcards, add cues, or import new material.
-          </ThemedText>
-        </View>
+          }
+        />
         <View style={styles.topicList}>
           {topicArray.length === 0 && !loading && (
             <ThemedText style={{ color: muted }}>
@@ -193,7 +192,7 @@ export default function AddFlashcardsScreen() {
 
       <Modal visible={Boolean(activeTopicId)} transparent animationType="slide" onRequestClose={closeModal}>
         <View style={[styles.modalBackdrop, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
-          <View style={[styles.modalCard, { backgroundColor: cardColor, borderColor }]}>
+          <View style={[styles.modalCard, cardSurface(cardColor)]}>
             <View style={styles.modalHeader}>
               <ThemedText type="subtitle">{topicName}</ThemedText>
               <TouchableOpacity onPress={closeModal}>
@@ -239,7 +238,7 @@ export default function AddFlashcardsScreen() {
                 listEmpty
               ) : (
                 activeFlashcards.map((item) => (
-                  <View key={item.id} style={[styles.flashcard, { borderColor }]}>
+                  <View key={item.id} style={[styles.flashcard, cardSurface(cardColor)]}>
                     <ThemedText type="defaultSemiBold">{item.front}</ThemedText>
                     <ThemedText style={[styles.flashcardBack, { color: muted }]}>
                       {item.back}
@@ -274,7 +273,7 @@ type TopicCardProps = {
 
 const TopicCard = ({ title, subtitle, onPress, cardColor, borderColor, muted }: TopicCardProps) => (
   <TouchableOpacity
-    style={[styles.topicCard, { backgroundColor: cardColor }]}
+    style={[styles.topicCard, cardSurface(cardColor)]}
     onPress={onPress}>
     <ThemedText type="defaultSemiBold">{title}</ThemedText>
     <ThemedText style={{ color: muted, marginTop: 6 }}>{subtitle}</ThemedText>
@@ -333,14 +332,6 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 20,
   },
-  header: {
-    gap: 4,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   addTopicButton: {
     width: 36,
     height: 36,
@@ -367,8 +358,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   topicCard: {
-    ...cardShadow,
-    borderWidth: 0,
     borderRadius: 16,
     padding: 16,
   },
@@ -399,9 +388,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalCard: {
-    ...cardShadow,
     borderRadius: 20,
-    borderWidth: 0,
     padding: 20,
     maxHeight: '90%',
     marginHorizontal: 4,
@@ -430,8 +417,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   flashcard: {
-    ...cardShadow,
-    borderWidth: 0,
     borderRadius: 16,
     padding: 16,
     marginHorizontal: 4,

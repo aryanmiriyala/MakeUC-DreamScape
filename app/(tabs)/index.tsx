@@ -3,8 +3,9 @@ import { useMemo } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PageHeading } from '@/components/page-heading';
 import { ThemedText } from '@/components/themed-text';
-import { cardShadow } from '@/constants/shadow';
+import { cardSurface } from '@/constants/shadow';
 import { Typography } from '@/constants/typography';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useStoreInitializer } from '@/hooks/use-store-initializer';
@@ -63,15 +64,12 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <Image source={LOGO_MARK} style={styles.logoMark} resizeMode="contain" />
-            <ThemedText type="title">DreamScape</ThemedText>
-          </View>
-          <ThemedText style={[Typography.body, { color: mutedText }]}>
-            Nightly microlearning, tailored to you.
-          </ThemedText>
-        </View>
+        <PageHeading
+          title="DreamScape"
+          subtitle="Nightly microlearning, tailored to you."
+          leadingSlot={<Image source={LOGO_MARK} style={styles.logoMark} resizeMode="contain" />}
+          spacing={24}
+        />
 
         <View style={styles.actionsWrapper}>
           {actionRows.map((row, rowIndex) => (
@@ -94,7 +92,7 @@ export default function HomeScreen() {
         </View>
 
         <View
-          style={[styles.highlightCard, { backgroundColor: highlightBackground, borderColor: highlightBorder }]}
+          style={[styles.highlightCard, cardSurface(highlightBackground), { borderColor: highlightBorder }]}
         >
           <ThemedText type="subtitle">Evening Flow</ThemedText>
           <ThemedText style={[Typography.body, { color: highlightCopy }]}>
@@ -137,14 +135,6 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 20,
   },
-  header: {
-    gap: 8,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
   logoMark: {
     width: 48,
     height: 48,
@@ -182,11 +172,10 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
   },
   highlightCard: {
-    ...cardShadow,
     borderRadius: 20,
     padding: 20,
     marginTop: 4,
     borderWidth: 1,
-    marginHorizontal: 2,
+    marginHorizontal: 4,
   },
 });
