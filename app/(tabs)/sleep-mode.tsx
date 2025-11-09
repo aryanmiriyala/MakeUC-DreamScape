@@ -6,10 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PageHeading } from '@/components/page-heading';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppButton } from '@/components/ui/app-button';
-import { cardShadow } from '@/constants/shadow';
+import { cardSurface, CARD_SHADOW } from '@/constants/shadow';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { fetchCueAudio } from '@/lib/elevenlabs';
 import { useSleepStore } from '@/store/sleepStore';
@@ -440,12 +441,13 @@ export default function SleepModeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <ThemedText type="subtitle">Sleep Mode</ThemedText>
-        <ThemedText style={[styles.subtitle, { color: muted }]}>
-          Simulate spaced cues with TTS while resting.
-        </ThemedText>
+        <PageHeading
+          title="Sleep Mode"
+          subtitle="Simulate spaced cues with TTS while resting."
+          spacing={16}
+        />
 
-        <View style={[styles.card, { backgroundColor: cardColor }]}>
+        <View style={[styles.card, cardSurface(cardColor)]}>
           <ThemedText>Status: {statusLabel}</ThemedText>
           <ThemedText style={{ color: muted }}>Cues played: {cuesPlayed}</ThemedText>
           <Animated.Text style={[styles.pulseText, { color: muted }, pulseStyle]}>
@@ -453,7 +455,7 @@ export default function SleepModeScreen() {
           </Animated.Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor }]}>
+        <View style={[styles.card, cardSurface(cardColor)]}>
           <ThemedText type="defaultSemiBold">Select topic</ThemedText>
           <View style={styles.topicRow}>
             {topicsLoading && topicOptions.length === 0 ? (
@@ -488,7 +490,7 @@ export default function SleepModeScreen() {
           ) : null}
         </View>
 
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, cardSurface(cardColor)]}>
           <ThemedText type="defaultSemiBold">Cue interval</ThemedText>
           <View style={styles.intervalRow}>
             {intervals.map((value) => {
@@ -518,7 +520,7 @@ export default function SleepModeScreen() {
         </View>
 
         {preparedCues.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: cardColor }]}>
+          <View style={[styles.card, cardSurface(cardColor)]}>
             <ThemedText type="defaultSemiBold">Queued cues</ThemedText>
             <View style={styles.cueList}>
               {preparedCues.map((cue) => (
@@ -531,7 +533,7 @@ export default function SleepModeScreen() {
         ) : null}
 
         {errorMessage ? (
-          <View style={[styles.card, { borderWidth: 1, borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
+          <View style={[styles.card, cardSurface('#fca5a533'), { borderWidth: 1, borderColor: '#f87171', backgroundColor: '#fca5a533' }]}>
             <ThemedText type="defaultSemiBold" style={{ color: '#7f1d1d' }}>
               {errorMessage}
             </ThemedText>
@@ -573,17 +575,12 @@ const styles = StyleSheet.create({
     gap: 16,
     overflow: 'visible',
   },
-  subtitle: {
-    fontSize: 14,
-  },
   card: {
-    ...cardShadow,
-    borderWidth: 0,
     borderRadius: 16,
     padding: 18,
     gap: 8,
-    marginHorizontal: 4,
-    marginTop: 8,
+    marginHorizontal: 6,
+    marginTop: 10,
   },
   pulseText: {
     marginTop: 4,
