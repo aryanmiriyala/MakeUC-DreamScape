@@ -14,6 +14,17 @@ export type SynthesizedCue = {
   bytes: number;
 };
 
+export type SoundEffectOptions = {
+  prompt: string;
+  durationSeconds?: number;
+  promptInfluence?: number;
+};
+
+export type SynthesizedSoundEffect = {
+  uri: string;
+  bytes: number;
+};
+
 function getApiKey(): string {
   const fromEnv = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY;
   const fromConfig = Constants?.expoConfig?.extra?.elevenlabsApiKey;
@@ -149,3 +160,89 @@ export async function fetchCueAudio(text: string, options?: TtsVoiceOptions): Pr
 
   return { uri: cachePath, bytes: base64.length * 0.75 };
 }
+
+/** 
+ * @param options - Configuration for sound effect generation
+ * @returns Promise with URI to the cached audio file
+ */
+export async function fetchAmbientAudio(options: SoundEffectOptions): Promise<SynthesizedSoundEffect> {
+  const { prompt, durationSeconds = 30, promptInfluence = 0.3 } = options;
+
+  if (!prompt || prompt.trim().length === 0) {
+    throw new Error('Cannot generate sound effect with empty prompt');
+  }
+
+  const apiKey = getApiKey();
+  const cacheRoot = getCacheRoot();
+  const folder = `${cacheRoot}elevenlabs-sfx/`;
+  const cacheKey = createCacheKey(`${prompt}-${durationSeconds}`, undefined);
+  const cachePath = `${folder}${cacheKey}.mp3`;
+
+  await ensureCacheFolder(folder);
+
+  // Check cache first
+  const existing = await FileSystem.getInfoAsync(cachePath);
+  if (existing.exists) {
+    return { uri: cachePath, bytes: existing.size ?? 0 };
+  }
+
+  // Generate sound effect using ElevenLabs Sound Effects API
+  const response = await fetch(`${ELEVEN_BASE_URL}/sound-generation`, {
+    method: 'POST',
+    headers: {
+      Accept: 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      text: prompt,
+      duration_seconds: durationSeconds,
+      prompt_influence: promptInfluence,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await safeReadError(response);
+    throw new Error(`ElevenLabs Sound Effects failed (${response.status}): ${message}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const base64 = arrayBufferToBase64(arrayBuffer);
+
+  await FileSystem.writeAsStringAsync(cachePath, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  return { uri: cachePath, bytes: base64.length * 0.75 };
+}
+
+/**
+ * Pre-defined ambient prompts optimized for sleep/study sessions
+ */
+export const AMBIENT_PRESETS = {
+  lofi: 'Soft lofi hip hop beats, mellow piano, gentle rain, calming and peaceful',
+  rain: 'Gentle rain falling, distant thunder, peaceful nature ambience',
+  ocean: 'Soft ocean waves, gentle beach sounds, calming seaside atmosphere',
+  forest: 'Peaceful forest ambience, rustling leaves, distant birds, serene nature',
+  cafe: 'Quiet coffee shop ambience, soft chatter, gentle acoustic music background',
+  white_noise: 'Gentle white noise, soft static, calming background sound for focus',
+  piano: 'Soft piano melody, ambient instrumental, peaceful and relaxing',
+  meditation: 'Deep meditation sounds, Tibetan singing bowls, peaceful zen atmosphere',
+} as const;
+
+export type AmbientPreset = keyof typeof AMBIENT_PRESETS;
+
+/**
+ * Convenience function to generate ambient audio from preset
+ */
+export async function fetchAmbientPreset(
+  preset: AmbientPreset,
+  durationSeconds = 30
+): Promise<SynthesizedSoundEffect> {
+  return fetchAmbientAudio({
+    prompt: AMBIENT_PRESETS[preset],
+    durationSeconds,
+    promptInfluence: 0.3,
+  });
+}
+
