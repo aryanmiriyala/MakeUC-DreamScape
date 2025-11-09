@@ -485,14 +485,14 @@ export default function SleepModeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(24, insets.bottom + 16) },
+          { paddingBottom: Math.max(24, insets.bottom + 16), paddingTop: 8 },
         ]}
         showsVerticalScrollIndicator={false}
       >
         <PageHeading
           title="Sleep Mode"
           subtitle="Simulate spaced cues with TTS while resting."
-          spacing={16}
+          spacing={12}
         />
 
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
@@ -724,15 +724,13 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   card: {
     borderWidth: 1,
     borderRadius: 16,
     padding: 18,
-    gap: 8,
-    marginHorizontal: 4,
-    marginTop: 10,
+    gap: 12,
     overflow: 'hidden',
   },
   subtitle: {
@@ -743,42 +741,42 @@ const styles = StyleSheet.create({
   },
   ambientScroll: {
     marginTop: 12,
+    marginHorizontal: -18,
+    paddingHorizontal: 18,
     paddingVertical: 4,
     overflow: 'hidden',
   },
   ambientRow: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 4,
   },
   ambientChip: {
     width: 78,
     aspectRatio: 1,
     borderRadius: 16,
     padding: 10,
-    marginHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   optionGrid: {
-    gap: 12,
+    gap: 10,
     marginTop: 12,
     overflow: 'visible',
   },
   optionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     overflow: 'visible',
   },
   optionButton: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    minHeight: 56,
     overflow: 'visible',
   },
   flatButton: {
@@ -815,9 +813,8 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 16,
+    marginTop: 8,
     marginBottom: 24,
-    marginHorizontal: 4,
   },
   primaryButton: {
     flex: 1,

@@ -104,20 +104,20 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PageHeading
           title="Settings"
           subtitle="Manage your account and app preferences"
-          spacing={24}
+          spacing={16}
         />
 
         {/* User Profile Section */}
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
           <View style={styles.sectionHeader}>
-            <ThemedText type="defaultSemiBold">👤 User Profile</ThemedText>
+            <ThemedText type="subtitle" style={{ fontSize: 18 }}>👤 User Profile</ThemedText>
             {!isEditing && (
-              <TouchableOpacity onPress={() => setIsEditing(true)}>
-                <Ionicons name="pencil" size={20} color={primary} />
+              <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
+                <Ionicons name="pencil" size={18} color={primary} />
               </TouchableOpacity>
             )}
           </View>
@@ -172,7 +172,7 @@ export default function SettingsScreen() {
 
         {/* App Statistics */}
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
-          <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
+          <ThemedText type="subtitle" style={{ fontSize: 18, marginBottom: 4 }}>
             📊 Your Statistics
           </ThemedText>
           
@@ -196,7 +196,7 @@ export default function SettingsScreen() {
             <ThemedText type="defaultSemiBold">{stats.cues}</ThemedText>
           </View>
           
-          <View style={styles.statRow}>
+          <View style={[styles.statRow, { borderBottomWidth: 0 }]}>
             <ThemedText style={{ color: muted }}>Topics Created</ThemedText>
             <ThemedText type="defaultSemiBold">{stats.topics}</ThemedText>
           </View>
@@ -204,7 +204,7 @@ export default function SettingsScreen() {
 
         {/* App Preferences */}
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
-          <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
+          <ThemedText type="subtitle" style={{ fontSize: 18, marginBottom: 4 }}>
             ⚙️ Preferences
           </ThemedText>
 
@@ -254,7 +254,7 @@ export default function SettingsScreen() {
 
         {/* About Section */}
         <View style={[styles.card, cardSurface(cardColor), { borderColor }]}>
-          <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
+          <ThemedText type="subtitle" style={{ fontSize: 18, marginBottom: 4 }}>
             ℹ️ About
           </ThemedText>
 
@@ -282,8 +282,8 @@ export default function SettingsScreen() {
         </View>
 
         {/* Danger Zone */}
-        <View style={[styles.card, cardSurface(cardColor), { borderColor: danger, borderWidth: 1 }]}>
-          <ThemedText type="defaultSemiBold" style={{ color: danger, marginBottom: 12 }}>
+        <View style={[styles.card, cardSurface(cardColor), { borderColor: danger, borderWidth: 1.5 }]}>
+          <ThemedText type="subtitle" style={{ fontSize: 18, color: danger, marginBottom: 4 }}>
             ⚠️ Danger Zone
           </ThemedText>
 
@@ -303,40 +303,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 24,
-    gap: 16,
+    padding: 20,
+    paddingTop: 8,
+    paddingBottom: 32,
+    gap: 20,
   },
   card: {
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 18,
-    gap: 12,
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  editButton: {
+    padding: 4,
   },
   inputGroup: {
-    gap: 6,
+    gap: 8,
   },
   input: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     fontSize: 16,
   },
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginTop: 4,
   },
   button: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   buttonText: {
@@ -347,30 +352,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(128, 128, 128, 0.15)',
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
+    gap: 16,
   },
   settingInfo: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   aboutRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
-  },
-  linkButton: {
     paddingVertical: 8,
   },
+  linkButton: {
+    paddingVertical: 10,
+  },
   dangerButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
   },
 });
