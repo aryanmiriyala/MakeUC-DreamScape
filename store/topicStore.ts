@@ -1,23 +1,24 @@
 import { create } from 'zustand';
 
 import {
-    createCuePayload,
-    createItemPayload,
-    createTopicPayload,
-    deleteCue,
-    deleteItem,
-    deleteTopic,
-    getCues,
-    getItems,
-    getTopics,
-    putCue,
-    putItem,
-    putTopic,
+  clearTopicData,
+  createCuePayload,
+  createItemPayload,
+  createTopicPayload,
+  deleteCue,
+  deleteItem,
+  deleteTopic,
+  getCues,
+  getItems,
+  getTopics,
+  putCue,
+  putItem,
+  putTopic,
 } from '@/lib/storage';
 import {
-    Cue,
-    Item,
-    Topic,
+  Cue,
+  Item,
+  Topic,
 } from '@/types';
 
 interface TopicStoreState {
@@ -52,6 +53,7 @@ interface TopicStoreState {
   removeCue: (cueId: string) => Promise<void>;
   getItemsForTopic: (topicId: string) => Item[];
   getCuesForItem: (itemId: string) => Cue[];
+  clearAll: () => Promise<void>;
 }
 
 function nowIso(): string {
@@ -339,5 +341,21 @@ export const useTopicStore = create<TopicStoreState>((set, get) => ({
   getCuesForItem: (itemId) => {
     const cues = get().cues;
     return Object.values(cues).filter((cue) => cue.itemId === itemId);
+  },
+
+  clearAll: async () => {
+    try {
+      await clearTopicData();
+      set({
+        topics: {},
+        items: {},
+        cues: {},
+        error: undefined,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to clear all data';
+      set({ error: message });
+      throw error;
+    }
   },
 }));
