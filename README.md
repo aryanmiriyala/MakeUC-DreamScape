@@ -2,7 +2,7 @@
 
 ![DreamScape logo](assets/images/DreamScape_img.jpg)
 
-**DreamScape** is an innovative sleep-based microlearning app that helps you learn passively while you rest. Built for UCMake Hackathon, this Expo-powered mobile application enables users to create flashcards, import documents, and listen to gentle audio cues during simulated sleep sessions—reinforcing knowledge through subconscious repetition.
+**DreamScape** is an innovative sleep-based microlearning app that helps you learn passively while you rest. Built for MakeUC Hackathon, this Expo-powered mobile application enables users to create flashcards, import documents, and listen to gentle audio cues during simulated sleep sessions—reinforcing knowledge through subconscious repetition.
 
 ## ✨ Features
 
@@ -102,8 +102,8 @@ constants/          # Theme, typography, shadows
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/aryanmiriyala/UCMake-DreamScape.git
-   cd UCMake-DreamScape
+   git clone https://github.com/aryanmiriyala/MakeUC-DreamScape.git
+   cd MakeUC-DreamScape
    ```
 
 2. **Install dependencies**
@@ -169,11 +169,11 @@ All branding assets are located in `assets/images/`:
 
 ## 🤝 Contributing
 
-This is a hackathon project built for UCMake. Contributions, issues, and feature requests are welcome!
+This is a hackathon project built for MakeUC. Contributions, issues, and feature requests are welcome!
 
 ## 📄 License
 
-This project was created for UCMake Hackathon.
+This project was created for MakeUC Hackathon.
 
 ## 🔗 Resources
 
@@ -185,7 +185,7 @@ This project was created for UCMake Hackathon.
 
 ## 👥 Team
 
-Built with ❤️ for UCMake Hackathon
+Built with ❤️ for MakeUC Hackathon
 
 ---
 
